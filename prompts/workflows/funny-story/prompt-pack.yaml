@@ -1,0 +1,9 @@
+schema: ssmdstudio.prompt-pack.v1
+id: funny-story
+kind: workflow
+stages:
+  characters: characters.md
+  scenes: scenes.md
+  draft: draft.md
+  revise: revise.md
+  ssmd: ssmd.md

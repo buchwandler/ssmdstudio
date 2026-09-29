@@ -5,32 +5,21 @@ import sys
 import zipfile
 from pathlib import Path
 
+import pytest
+
 from ssmdstudio.cli import main
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGED_SKILL = "ssmdstudio/resources/skills/ssmdstudio/SKILL.md"
 
 
-def test_skill_commands_show_path_and_install(tmp_path: Path, capsys) -> None:
-    source_skill = ROOT / "skill" / "ssmdstudio" / "SKILL.md"
-    resource_skill = ROOT / PACKAGED_SKILL
-    assert source_skill.read_bytes() == resource_skill.read_bytes()
-
-    main(["skill", "show"])
-    assert capsys.readouterr().out == resource_skill.read_text(encoding="utf-8")
-
-    main(["skill", "path"])
-    skill_path = Path(capsys.readouterr().out.strip())
-    assert skill_path == resource_skill
-
-    target = tmp_path / "harness-skills" / "ssmdstudio"
-    main(["skill", "install", str(target)])
-    installed = target / "SKILL.md"
-    assert Path(capsys.readouterr().out.strip()) == installed
-    assert installed.read_bytes() == resource_skill.read_bytes()
+def test_skill_commands_are_not_part_of_the_cli(capsys) -> None:
+    with pytest.raises(SystemExit) as error:
+        main(["skill", "show"])
+    assert error.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err
 
 
-def test_wheel_contains_bundled_skill(tmp_path: Path) -> None:
+def test_wheel_contains_typing_metadata_but_no_prompt_or_skill_prose(tmp_path: Path) -> None:
     result = subprocess.run(
         [sys.executable, "-m", "build", "--wheel", "--outdir", str(tmp_path)],
         cwd=ROOT,
@@ -43,6 +32,12 @@ def test_wheel_contains_bundled_skill(tmp_path: Path) -> None:
     wheels = list(tmp_path.glob("*.whl"))
     assert len(wheels) == 1
     with zipfile.ZipFile(wheels[0]) as wheel:
-        assert PACKAGED_SKILL in wheel.namelist()
-        content = wheel.read(PACKAGED_SKILL)
-    assert content == (ROOT / "skill" / "ssmdstudio" / "SKILL.md").read_bytes()
+        members = set(wheel.namelist())
+
+    package_members = {name for name in members if name.startswith("ssmdstudio/")}
+    assert "ssmdstudio/py.typed" in package_members
+    assert not any(name.endswith(".md") for name in package_members)
+    assert not any("/resources/" in name for name in package_members)
+    assert not any(name.endswith("SKILL.md") for name in members)
+    assert not any(name.startswith("skill/") for name in members)
+    assert not (ROOT / "ssmdstudio" / "resources").exists()

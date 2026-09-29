@@ -19,7 +19,7 @@ from .models import (
     SSMDRole,
     validate_ssmd_role,
 )
-from .prompts import STAGES, STAGE_SPECS, render_template
+from .prompts import STAGE_SPECS, STAGES, PromptPack, render_template
 from .store import (
     atomic_write_text,
     dump_yaml,
@@ -29,6 +29,13 @@ from .store import (
     write_json,
     write_yaml,
 )
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.exists():
+        shutil.rmtree(path)
 
 
 class Studio:
@@ -53,6 +60,7 @@ class Studio:
         duration_minutes: float | None = None,
         constraints: list[str] | None = None,
         allow_nested: bool = False,
+        prompt_pack: str | Path | None = None,
     ) -> Studio:
         root = Path(path).resolve()
         if (root / "project.yaml").exists():
@@ -67,6 +75,8 @@ class Studio:
         if recipe != "funny-story":
             raise ValueError("the MVP currently supports only recipe='funny-story'")
 
+        if prompt_pack is not None:
+            PromptPack.open(prompt_pack)
         root.mkdir(parents=True, exist_ok=True)
         for name in ("characters", "scenes", "feedback", "drafts", "output", "runs"):
             (root / name).mkdir(exist_ok=True)
@@ -83,7 +93,10 @@ class Studio:
             constraints=constraints or [],
         )
         write_yaml(root / "project.yaml", config.to_dict())
-        return cls(root, config)
+        studio = cls(root, config)
+        if prompt_pack is not None:
+            studio.install_prompt_pack(prompt_pack)
+        return studio
 
     @classmethod
     def open(cls, path: str | Path = ".") -> Studio:
@@ -103,6 +116,56 @@ class Studio:
 
     def save_config(self) -> None:
         write_yaml(self.root / "project.yaml", self.config.to_dict())
+
+    @property
+    def prompt_pack_path(self) -> Path:
+        return self.root / "prompts"
+
+    def _require_prompt_pack(self) -> PromptPack:
+        manifest = self.prompt_pack_path / "prompt-pack.yaml"
+        if not manifest.is_file():
+            raise FileNotFoundError(
+                f"no workflow prompt pack is installed for project {self.config.id!r}\n"
+                "hint: ssmdstudio prompt pack install PATH"
+            )
+        return PromptPack.open(self.prompt_pack_path)
+
+    def install_prompt_pack(self, source: str | Path, *, replace: bool = False) -> Path:
+        source_pack = PromptPack.open(source)
+        target = self.prompt_pack_path
+        target_exists = target.exists() or target.is_symlink()
+        if target_exists and not replace:
+            raise FileExistsError(
+                f"project prompt pack already exists at {target}; pass replace=True to replace it"
+            )
+
+        for path in source_pack.root.rglob("*"):
+            if path.is_symlink():
+                raise ValueError(f"prompt pack cannot contain symlinks: {path}")
+
+        staging = Path(tempfile.mkdtemp(prefix=".prompts-staging-", dir=self.root))
+        backup = self.root / f".prompts-backup-{uuid4().hex}"
+        try:
+            shutil.copytree(source_pack.root, staging, dirs_exist_ok=True)
+            PromptPack.open(staging)
+            if not replace and (target.exists() or target.is_symlink()):
+                raise FileExistsError(
+                    f"project prompt pack already exists at {target}; pass replace=True to replace it"
+                )
+            if target.exists() or target.is_symlink():
+                os.replace(target, backup)
+            os.replace(staging, target)
+            if backup.exists() or backup.is_symlink():
+                _remove_path(backup)
+            return target
+        finally:
+            if staging.exists():
+                shutil.rmtree(staging)
+            if backup.exists() or backup.is_symlink():
+                if target.exists() or target.is_symlink():
+                    _remove_path(backup)
+                else:
+                    os.replace(backup, target)
 
     def add_character(
         self,
@@ -217,11 +280,15 @@ class Studio:
         except yaml.YAMLError as exc:
             raise ValueError(f"invalid character YAML: {exc}") from exc
         if not isinstance(data, dict) or not isinstance(data.get("characters"), list):
-            raise ValueError("character import expects a YAML mapping with a 'characters' list")
+            raise ValueError(  # noqa: TRY004
+                "character import expects a YAML mapping with a 'characters' list"
+            )
         imported: list[Character] = []
         for item in data["characters"]:
             if not isinstance(item, dict):
-                raise ValueError("every imported character must be a YAML mapping")
+                raise ValueError(  # noqa: TRY004
+                    "every imported character must be a YAML mapping"
+                )
             self._require_fields(item, ("id", "name", "role", "description"), "character")
             self._validate_list_fields(item, ("traits", "goals", "constraints"), "character")
             character_id = self._canonical_id(item["id"], "character")
@@ -299,11 +366,15 @@ class Studio:
         except yaml.YAMLError as exc:
             raise ValueError(f"invalid scene YAML: {exc}") from exc
         if not isinstance(data, dict) or not isinstance(data.get("scenes"), list):
-            raise ValueError("scene import expects a YAML mapping with a 'scenes' list")
+            raise ValueError(  # noqa: TRY004
+                "scene import expects a YAML mapping with a 'scenes' list"
+            )
         imported: list[Scene] = []
         for item in data["scenes"]:
             if not isinstance(item, dict):
-                raise ValueError("every imported scene must be a YAML mapping")
+                raise ValueError(  # noqa: TRY004
+                    "every imported scene must be a YAML mapping"
+                )
             self._require_fields(item, ("id", "title", "purpose"), "scene")
             self._validate_list_fields(item, ("characters", "events", "constraints"), "scene")
             scene_id = self._canonical_id(item["id"], "scene")
@@ -455,10 +526,7 @@ class Studio:
             return None
         for stage in STAGES:
             spec = STAGE_SPECS[stage]
-            if stage == "revise":
-                if all(state[name] for name in spec.prerequisites):
-                    return stage
-            elif stage == "ssmd":
+            if stage in {"revise", "ssmd"}:
                 if all(state[name] for name in spec.prerequisites):
                     return stage
             elif not state[stage] and all(state[name] for name in spec.prerequisites):
@@ -619,24 +687,27 @@ class Studio:
                 raise ValueError("SSMD generation requires a draft with no open feedback")
             raise ValueError(f"stage {stage!r} is missing prerequisite {prerequisite!r}")
 
-        return (
-            render_template(
-                stage,
-                {
-                    "PROJECT": self._context_project(compact=stage == "ssmd"),
-                    "CHARACTERS": self._context_characters(),
-                    "SPEAKERS": self._context_speakers(),
-                    "SCENES": self._context_scenes(),
-                    "FEEDBACK": self._context_feedback(),
-                    "DRAFT": self.draft_text() or "(no draft yet)",
-                    "ARTIFACT_NAME": STAGE_SPECS[stage].expected_artifact(self.config.id),
-                },
-            ).rstrip()
-            + "\n"
-        )
+        pack = self._require_prompt_pack()
+        template = pack.template_text(stage)
+        values = {
+            "PROJECT": self._context_project(compact=stage == "ssmd"),
+            "CHARACTERS": self._context_characters(),
+            "SPEAKERS": self._context_speakers(),
+            "SCENES": self._context_scenes(),
+            "FEEDBACK": self._context_feedback(),
+            "DRAFT": self.draft_text() or "(no draft yet)",
+            "ARTIFACT_NAME": STAGE_SPECS[stage].expected_artifact(self.config.id),
+        }
+        return render_template(template, values).rstrip() + "\n"
 
     def _stage_input_paths(self, stage: str) -> list[Path]:
-        paths = [self.root / "project.yaml"]
+        manifest = self.prompt_pack_path / "prompt-pack.yaml"
+        if manifest.is_file():
+            pack = self._require_prompt_pack()
+            prompt_paths = [manifest, pack.template_path(stage)]
+        else:
+            prompt_paths = [manifest, self.prompt_pack_path / f"{stage}.md"]
+        paths = [self.root / "project.yaml", *prompt_paths]
         paths.extend(sorted((self.root / "characters").glob("*.yaml")))
         if stage in {"draft", "revise"}:
             paths.extend(sorted((self.root / "scenes").glob("*.yaml")))
@@ -651,6 +722,10 @@ class Studio:
     def save_prompt_run(self, stage: str, prompt: str | None = None) -> Path:
         if stage not in STAGE_SPECS:
             raise ValueError(f"unknown prompt stage {stage!r}; choose from {', '.join(STAGES)}")
+        pack = self._require_prompt_pack()
+        template_path = pack.template_path(stage)
+        template_sha256 = hashlib.sha256(template_path.read_bytes()).hexdigest()
+        template_name = template_path.relative_to(pack.root).as_posix()
         prompt = prompt if prompt is not None else self.build_prompt(stage)
         fingerprint, inputs = hash_files(self._stage_input_paths(stage), root=self.root)
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
@@ -663,6 +738,12 @@ class Studio:
                 "schema": "ssmdstudio.run.v1",
                 "stage": stage,
                 "expected_artifact": STAGE_SPECS[stage].expected_artifact(self.config.id),
+                "prompt_pack": {
+                    "id": pack.id,
+                    "schema": pack.schema,
+                    "template": template_name,
+                    "template_sha256": template_sha256,
+                },
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "input_fingerprint": fingerprint,
                 "inputs": inputs,
@@ -695,6 +776,8 @@ class Studio:
         return statuses
 
     def status(self) -> dict[str, Any]:
+        manifest = self.prompt_pack_path / "prompt-pack.yaml"
+        prompt_pack = PromptPack.open(self.prompt_pack_path) if manifest.is_file() else None
         return {
             "root": str(self.root),
             "project": self.config.id,
@@ -707,4 +790,9 @@ class Studio:
             "validation": self.validation_status(),
             "next_stage": self.next_stage(),
             "runs": self.run_statuses(),
+            "prompt_pack": {
+                "installed": prompt_pack is not None,
+                "id": prompt_pack.id if prompt_pack is not None else None,
+                "path": "prompts",
+            },
         }

@@ -33,11 +33,7 @@ include = ["ssmdstudio*"]
 exclude = ["tests*", "skill*"]
 
 [tool.setuptools.package-data]
-ssmdstudio = [
-  "py.typed",
-  "resources/prompts/funny-story/*.md",
-  "resources/skills/ssmdstudio/SKILL.md",
-]
+ssmdstudio = ["py.typed"]
 
 [tool.setuptools_scm]
 fallback_version = "0+unknown"

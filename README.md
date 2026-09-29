@@ -7,9 +7,14 @@ history.
 
 ## Design boundary
 
-SSMD Studio stores authoring state, compiles provider-neutral prompts, and applies returned files.
-A human or harness executes the prompts. SSMD Studio does not call model providers or render
-audio. The optional `ssmd` runtime validates the final document when installed.
+SSMDStudio's Python package stores authoring state, validates project data, assembles prompt context, renders project-owned workflow templates, applies returned artifacts, and optionally validates final SSMD. It contains no prompt prose or Agent Skill content. Prompt packs and skills are repository/user data outside the Python wheel; a project's installed workflow pack is copied into `PROJECT/prompts/` and can be edited independently of Python releases.
+
+## Prompt families
+
+- `prompts/workflows/funny-story/` is a structured workflow pack. Its five stage templates receive project context and produce artifacts consumed by SSMDStudio; the final `ssmd.md` converts an approved locked draft.
+- `prompts/standalone/ssmd/` contains 15 self-contained authoring guides for direct use with a generic LLM. They create SSMD documents without the structured project workflow.
+
+The standalone creative `funny-story.md` and the workflow conversion `ssmd.md` are different prompts. Readio runtime `.ssmd` templates are not LLM prompts and are not included in the catalog. See `prompts/README.md` and `prompts/standalone/README.md` for details.
 
 ## Standalone projects and workspaces
 
@@ -17,7 +22,8 @@ A standalone project remains the simplest option and keeps the original flat lay
 
 ```bash
 ssmdstudio init picnic --title "The Picnic Problem" --brief \
-  "Anna prepares a picnic while a curious dog keeps stealing napkins."
+  "Anna prepares a picnic while a curious dog keeps stealing napkins." \
+  --prompt-pack /path/to/ssmdstudio/prompts/workflows/funny-story
 cd picnic
 ssmdstudio status
 ```
@@ -39,16 +45,16 @@ Create and select workspace projects with:
 ssmdstudio workspace init
 ssmdstudio project create printer-story \
   --title "Funny printer story" \
-  --brief "A person tries to print while the printer develops a bureaucratic personality."
+  --brief "A person tries to print while the printer develops a bureaucratic personality." \
+  --prompt-pack /path/to/ssmdstudio/prompts/workflows/funny-story
 ssmdstudio project list
 ssmdstudio project use printer-story
 ssmdstudio project show
 ```
 
-The active project is a convenience. Scriptable commands can use `--project ID` or a project
-path to select a project explicitly. Existing standalone directories continue to work with
-`Studio.open(PATH)` and the original `ssmdstudio init PATH` command. Nested projects are refused
-by default; `--allow-nested` is an explicit override.
+The active project is a convenience. Scriptable commands can use `--project ID` or a project path to select a project explicitly. Existing standalone directories continue to work with `Studio.open(PATH)` and the original `ssmdstudio init PATH` command. Nested projects are refused by default; `--allow-nested` is an explicit override.
+
+Prompt packs are optional for project-state operations but required for prompt compilation. Include `--prompt-pack` at creation or install one later with `ssmdstudio prompt pack install PATH`.
 
 ## Two authoring workflows
 
@@ -80,22 +86,30 @@ The expected filenames are `characters.yaml`, `scenes.yaml`, `draft.md`, and
 
 ### Harness / skill
 
-Use this when the user asks a harness to create the story. The harness runs the same compiled
-prompts and applies its responses through SSMD Studio. It should pause for approval after the
-character and scene checkpoints, present the draft for review, record requested edits as feedback,
-and use targeted revisions before converting approved prose to SSMD.
+Use this when the user asks a harness to create the story. The harness runs the project's installed prompt files and applies responses through SSMD Studio. Pause for approval after the character and scene checkpoints, present the draft for review, record requested edits as feedback, and use targeted revisions before converting approved prose to SSMD.
 
-The skill is bundled in the wheel and can be shown, located, or installed into a directory chosen
-by the user or harness:
+The canonical Agent Skill is repository data at `skill/ssmdstudio/SKILL.md`; it is not bundled in the Python wheel. SSMDStudio does not provide `skill show`, `skill path`, or `skill install` commands. The harness should load the skill from the repository or user-managed skill location, and should use the project's own prompt files rather than assuming package-owned templates.
+
+## Prompt-pack setup
+
+Select a workflow pack when creating a project:
 
 ```bash
-ssmdstudio skill show
-ssmdstudio skill path
-ssmdstudio skill install ~/.agents/skills/ssmdstudio
+ssmdstudio init picnic --title "The Picnic Problem" --brief \
+  "Anna prepares a picnic while a curious dog keeps stealing napkins." \
+  --prompt-pack /path/to/ssmdstudio/prompts/workflows/funny-story
 ```
 
-The install command writes `SKILL.md` under the specified directory. SSMD Studio does not choose a
-vendor-specific global skills directory.
+`--prompt-pack` is optional: project state, validation, and artifact operations work without prompt data, but `prompt build` and `prompt next` report a clear error until a pack is installed. For an existing project, run installation from its directory or pass `--project ID/PATH`:
+
+```bash
+ssmdstudio prompt pack validate /path/to/prompt-pack
+ssmdstudio prompt pack install /path/to/ssmdstudio/prompts/workflows/funny-story
+ssmdstudio prompt pack path
+# Use --replace to explicitly replace the project's installed pack.
+```
+
+The installed copy is `PROJECT/prompts/`; edits to its manifest or stage template affect prompt-run staleness. `status` reports the installed pack id and path.
 
 ## Prompt and artifact workflow
 
@@ -133,6 +147,7 @@ A standalone project contains plain YAML and Markdown:
 
 ```text
 project.yaml
+prompts/ (optional project-owned workflow pack)
 characters/
 scenes/
 feedback/
@@ -142,9 +157,7 @@ output/validation.json
 runs/
 ```
 
-Prompt runs store the generated prompt and a manifest containing the input fingerprint, expected
-artifact, and response provenance. `ssmdstudio status` reports inventory, next stage, prompt
-staleness, and current validation state.
+Prompt runs store the generated prompt, stage-template provenance (pack id, schema, template path, and SHA-256), and a fingerprint of project state plus the prompt pack manifest and stage template. `ssmdstudio status` reports inventory, installed prompt pack, next stage, prompt staleness, and current validation state.
 
 ## Python API
 
@@ -153,9 +166,12 @@ from ssmdstudio import Studio, Workspace
 
 workspace = Workspace.open("my-stories")
 studio = workspace.resolve_project("printer-story")
+# This project must already have an installed workflow pack.
 prompt = studio.build_prompt("characters")
 print(prompt)
 ```
+
+For Python callers, `studio.install_prompt_pack(PATH)` installs external pack data into the project, and `studio.prompt_pack_path` points to its editable copy.
 
 For a standalone project, use `Studio.open("picnic")`. The Python API and CLI share the same
 filesystem-backed state.

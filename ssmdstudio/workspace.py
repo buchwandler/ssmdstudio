@@ -74,6 +74,7 @@ class Workspace:
         tone: str = "warm comic",
         duration_minutes: float | None = None,
         constraints: list[str] | None = None,
+        prompt_pack: str | Path | None = None,
     ) -> Studio:
         normalized_id = slugify(project_id)
         return Studio.init(
@@ -87,6 +88,7 @@ class Workspace:
             tone=tone,
             duration_minutes=duration_minutes,
             constraints=constraints,
+            prompt_pack=prompt_pack,
         )
 
     def list_projects(self) -> list[Studio]:

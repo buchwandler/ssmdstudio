@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import sys
-from importlib.resources import as_file, files
 from pathlib import Path
 
 from . import __version__
 from .project import Studio
-from .prompts import STAGES, STAGE_SPECS
+from .prompts import STAGE_SPECS, STAGES, PromptPack
 from .store import atomic_write_text
 from .workspace import Workspace
 
@@ -47,6 +45,7 @@ def _parser() -> argparse.ArgumentParser:
     p_init.add_argument("path")
     p_init.add_argument("--title", required=True)
     p_init.add_argument("--brief", required=True)
+    p_init.add_argument("--prompt-pack")
     p_init.add_argument("--id", dest="project_id")
     p_init.add_argument("--recipe", default="funny-story")
     p_init.add_argument("--language", default="en")
@@ -67,6 +66,7 @@ def _parser() -> argparse.ArgumentParser:
     p_project_create.add_argument("project_id")
     p_project_create.add_argument("--title", required=True)
     p_project_create.add_argument("--brief", required=True)
+    p_project_create.add_argument("--prompt-pack")
     p_project_create.add_argument("--recipe", default="funny-story")
     p_project_create.add_argument("--language", default="en")
     p_project_create.add_argument("--audience", default="general")
@@ -78,15 +78,6 @@ def _parser() -> argparse.ArgumentParser:
     p_project_use.add_argument("project_id")
     p_project_show = project_sub.add_parser("show", help="show a workspace project")
     p_project_show.add_argument("project_id", nargs="?")
-
-    p_skill = sub.add_parser("skill", help="show or install the bundled harness skill")
-    skill_sub = p_skill.add_subparsers(dest="skill_command", required=True)
-    skill_sub.add_parser("show", help="print the bundled skill")
-    skill_sub.add_parser("path", help="print the bundled skill path")
-    p_skill_install = skill_sub.add_parser(
-        "install", help="install the skill into a target directory"
-    )
-    p_skill_install.add_argument("target")
 
     p_character = sub.add_parser("character", help="manage characters")
     character_sub = p_character.add_subparsers(dest="character_command", required=True)
@@ -152,6 +143,22 @@ def _parser() -> argparse.ArgumentParser:
 
     p_prompt = sub.add_parser("prompt", help="compile prompts from stored project state")
     prompt_sub = p_prompt.add_subparsers(dest="prompt_command", required=True)
+    p_prompt_pack = prompt_sub.add_parser("pack", help="manage workflow prompt packs")
+    prompt_pack_sub = p_prompt_pack.add_subparsers(dest="prompt_pack_command", required=True)
+    p_prompt_pack_install = prompt_pack_sub.add_parser(
+        "install", help="install a workflow prompt pack"
+    )
+    p_prompt_pack_install.add_argument("path")
+    p_prompt_pack_install.add_argument("--project")
+    p_prompt_pack_install.add_argument("--replace", action="store_true")
+    p_prompt_pack_path = prompt_pack_sub.add_parser(
+        "path", help="show the project prompt directory"
+    )
+    p_prompt_pack_path.add_argument("--project")
+    p_prompt_pack_validate = prompt_pack_sub.add_parser(
+        "validate", help="validate a workflow prompt pack"
+    )
+    p_prompt_pack_validate.add_argument("path")
     p_prompt_build = prompt_sub.add_parser("build")
     p_prompt_build.add_argument("stage", choices=STAGES)
     p_prompt_build.add_argument("--project")
@@ -234,6 +241,7 @@ def main(argv: list[str] | None = None) -> None:
                 duration_minutes=args.duration_minutes,
                 constraints=args.constraint,
                 allow_nested=args.allow_nested,
+                prompt_pack=args.prompt_pack,
             )
             print(studio.root)
             return
@@ -241,24 +249,6 @@ def main(argv: list[str] | None = None) -> None:
         if args.command == "workspace" and args.workspace_command == "init":
             print(Workspace.init(args.path).root)
             return
-
-        if args.command == "skill":
-            skill = files("ssmdstudio").joinpath("resources", "skills", "ssmdstudio", "SKILL.md")
-            if args.skill_command == "show":
-                sys.stdout.write(skill.read_text(encoding="utf-8"))
-                return
-            if args.skill_command == "path":
-                with as_file(skill) as skill_path:
-                    print(skill_path)
-                return
-            if args.skill_command == "install":
-                target = Path(args.target)
-                target.mkdir(parents=True, exist_ok=True)
-                installed = target / "SKILL.md"
-                with as_file(skill) as skill_path:
-                    shutil.copyfile(skill_path, installed)
-                print(installed)
-                return
 
         if args.command == "project" and args.project_command == "create":
             workspace = Workspace.open()
@@ -272,6 +262,7 @@ def main(argv: list[str] | None = None) -> None:
                 tone=args.tone,
                 duration_minutes=args.duration_minutes,
                 constraints=args.constraint,
+                prompt_pack=args.prompt_pack,
             )
             print(studio.root)
             return
@@ -377,6 +368,19 @@ def main(argv: list[str] | None = None) -> None:
                 sys.stderr.write(result["stderr"])
             parser.exit(1, "validation failed\n")
 
+        if args.command == "prompt" and args.prompt_command == "pack":
+            if args.prompt_pack_command == "install":
+                studio = _studio(args.project)
+                print(studio.install_prompt_pack(args.path, replace=args.replace))
+                return
+            if args.prompt_pack_command == "path":
+                print(_studio(args.project).prompt_pack_path)
+                return
+            if args.prompt_pack_command == "validate":
+                pack = PromptPack.open(args.path)
+                print(f"valid workflow prompt pack: {pack.id}")
+                return
+
         if args.command == "prompt" and args.prompt_command == "build":
             studio = _studio(args.project)
             prompt = studio.build_prompt(args.stage)
@@ -427,6 +431,9 @@ def main(argv: list[str] | None = None) -> None:
             print(f"project: {status['project']}")
             print(f"root: {status['root']}")
             print(f"recipe: {status['recipe']}")
+            pack = status["prompt_pack"]
+            print(f"prompt pack: {pack['id'] or 'not installed'}")
+            print(f"prompt path: {pack['path']}/")
             print(f"characters: {status['characters']}")
             print(f"scenes: {status['scenes']}")
             print(f"open feedback: {status['open_feedback']}")

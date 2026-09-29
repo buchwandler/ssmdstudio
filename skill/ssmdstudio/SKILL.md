@@ -12,6 +12,8 @@ Use SSMD Studio when the user is creating or revising SSMD content rather than r
 
 - The project store is the source of truth. Do not keep important character, scene, or revision decisions only in chat history.
 - Keep SSMD Studio provider-independent. The harness executes prompts; the CLI stores state, compiles prompts, applies artifacts, and reports validation.
+- Workflow prompt packs are external, editable project data, not packaged Python resources. Before `prompt build` or `prompt next`, confirm a pack is installed; use `ssmdstudio prompt pack path` or install available user/repository data with `ssmdstudio prompt pack install PATH --project ID`. Project-state commands still work without a pack.
+- The canonical Agent Skill is repository/user-managed data at `skill/ssmdstudio/SKILL.md`. The wheel and CLI do not provide skill show/path/install commands.
 - Do not invent concrete TTS voice IDs. Use stable symbolic roles and do not use prosody as speaker identity.
 - Preserve locked scenes and explicit human constraints.
 - Do not report SSMD as validated unless an installed SSMD runtime actually ran.
@@ -28,7 +30,10 @@ Use **Harness / skill** when the user asks this harness to write the story. Exec
 
    ```bash
    ssmdstudio workspace init
-   ssmdstudio project create printer-story --title "Funny printer story" --brief "A person tries to print a document while the office printer develops a bureaucratic personality."
+   ssmdstudio project create printer-story \
+     --title "Funny printer story" \
+     --brief "A person tries to print a document while the office printer develops a bureaucratic personality." \
+     --prompt-pack /path/to/ssmdstudio/prompts/workflows/funny-story
    ssmdstudio project use printer-story
    ```
 
@@ -47,7 +52,11 @@ Standalone projects remain supported. From a standalone project directory, use `
 
 If the user has not supplied a story premise and title, ask only for those two essentials. Use project defaults for recipe, language, audience, tone, and duration unless the user asks to change them. Open an existing project when requested; otherwise create a standalone project or a workspace project according to the user's preference.
 
+After creating or opening a project, check `ssmdstudio status` for an installed prompt pack before generating. If none is installed, use an available external pack or ask the user where their workflow prompts are; do not substitute standalone guides or Readio runtime `.ssmd` templates.
+
 Use explicit `--project ID` or a project path when addressing projects. The active project is a convenience, not the only way to select one.
+
+For an existing project without a pack, install an available workflow pack explicitly, for example `ssmdstudio prompt pack install /path/to/prompt-pack --project printer-story`. Do not assume prompt data is inside the Python package.
 
 ### Characters checkpoint
 
@@ -81,6 +90,8 @@ Use explicit `--project ID` or a project path when addressing projects. The acti
 
 - `ssmdstudio next` shows the next stage, expected file, and follow-up command.
 - `ssmdstudio status` shows stored state and stage progress.
+- `ssmdstudio prompt pack install PATH`, `prompt pack path`, and `prompt pack validate PATH` manage external workflow packs; use `--replace` only when the user approves replacement.
+- The standalone LLM guides live in repository data under `prompts/standalone/`; they do not replace the structured workflow pack.
 - `ssmdstudio project list`, `project use ID`, and `project show` manage workspace projects.
 - An explicit `--project ID` overrides the active workspace project.
 - Keep the project's files as the source of truth. Chat history is not a substitute for applying artifacts and feedback to the store.

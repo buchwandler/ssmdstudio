@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
+import hashlib
 import json
+from pathlib import Path
 
 import pytest
 import yaml
@@ -12,11 +13,13 @@ from ssmdstudio.prompts import STAGE_SPECS
 
 
 def make_studio(tmp_path: Path) -> Studio:
-    return Studio.init(
+    studio = Studio.init(
         tmp_path / "story",
         title="Picnic trouble",
         brief="Anna prepares a picnic while a dog keeps stealing napkins.",
     )
+    studio.install_prompt_pack(Path(__file__).parents[1] / "prompts" / "workflows" / "funny-story")
+    return studio
 
 
 def test_flat_project_store_and_prompt_pipeline(tmp_path: Path) -> None:
@@ -121,6 +124,57 @@ def test_prompt_run_becomes_stale_after_input_change(tmp_path: Path) -> None:
         name="Milo",
         role="counterpart",
         description="Curious.",
+    )
+    assert studio.run_statuses()[-1]["state"] == "stale"
+
+
+def test_prompt_compilation_requires_a_project_prompt_pack(tmp_path: Path) -> None:
+    studio = Studio.init(tmp_path / "story", title="Test", brief="A story.")
+
+    with pytest.raises(
+        FileNotFoundError,
+        match="(?s)no workflow prompt pack is installed.*ssmdstudio prompt pack install PATH",
+    ):
+        studio.build_prompt("characters")
+
+
+def test_compiler_uses_custom_template_and_rejects_unknown_placeholders(
+    tmp_path: Path,
+) -> None:
+    studio = make_studio(tmp_path)
+    template_path = studio.prompt_pack_path / "characters.md"
+    template_path.write_text(
+        "Custom user prompt for {{ARTIFACT_NAME}} in {{PROJECT}}.", encoding="utf-8"
+    )
+
+    prompt = studio.build_prompt("characters")
+
+    assert "Custom user prompt for characters.yaml" in prompt
+    assert "id: story" in prompt
+
+    template_path.write_text("Use {{SOURCE_NOTES}}", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"unresolved placeholder.*\{\{SOURCE_NOTES\}\}"):
+        studio.build_prompt("characters")
+
+
+def test_prompt_run_tracks_template_fingerprint_and_provenance(tmp_path: Path) -> None:
+    studio = make_studio(tmp_path)
+    run_dir = studio.save_prompt_run("characters")
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    template_path = studio.prompt_pack_path / "characters.md"
+    provenance = manifest["prompt_pack"]
+
+    assert provenance["id"] == "funny-story"
+    assert provenance["schema"] == "ssmdstudio.prompt-pack.v1"
+    assert provenance["template"] == "characters.md"
+    assert provenance["template_sha256"] == hashlib.sha256(template_path.read_bytes()).hexdigest()
+    assert {"prompts/prompt-pack.yaml", "prompts/characters.md"} <= {
+        item["path"] for item in manifest["inputs"]
+    }
+    assert studio.run_statuses()[-1]["state"] == "current"
+
+    template_path.write_text(
+        template_path.read_text(encoding="utf-8") + "\\nUser edit.\\n", encoding="utf-8"
     )
     assert studio.run_statuses()[-1]["state"] == "stale"
 
