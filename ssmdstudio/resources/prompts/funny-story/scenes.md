@@ -1,33 +1,34 @@
 # Task: design the scene plan
 
-Design the scenes for this funny spoken story. Do not write polished story prose yet.
+Design the complete scene plan for this funny spoken story. Do not write polished story prose yet.
 
 Use the supplied project and characters as fixed authoring state. Preserve their identities,
-constraints, and roles.
+constraints, and roles. Return the complete currently approved scene plan, not only newly added
+scenes.
 
-The scene arc should normally:
+The scene arc should normally establish the protagonist's ordinary goal, introduce a small
+complication with clear consequences, escalate through distinct understandable beats, create an
+opportunity for a callback, resolve with a reversal or punchline, and finish with a very short
+aftermath instead of explaining the joke.
 
-1. establish the protagonist's ordinary goal;
-2. introduce a small complication with a clear consequence;
-3. escalate through distinct, understandable beats;
-4. create an opportunity for a callback to an earlier detail;
-5. resolve with a reversal or punchline;
-6. finish with a very short aftermath instead of explaining the joke.
+The listener will not see stage directions or a page layout. Every scene must have a clear
+purpose, characters, and observable events. Prefer plausible misunderstandings and specific
+comic details over arbitrary nonsense. Preserve user-controlled `locked` values.
 
-The listener will not see stage directions or a page layout. Every scene must therefore have
-a clear purpose, characters, and observable events. Prefer plausible misunderstandings and
-specific comic details over arbitrary nonsense.
+IDs must already be lowercase kebab-case and remain stable across later stages. Examples:
+`scene-01`, `printer-reboot`, `quiet-aftermath`.
 
-Return YAML only, as a list under the key `scenes`. Each item should contain:
+## Deliverable
 
-- `id`
-- `title`
-- `purpose`
-- `characters` (character IDs)
-- `events`
-- `comic_function`
-- `constraints`
-- `locked` (false unless already constrained)
+Create exactly one artifact named `{{ARTIFACT_NAME}}`.
+
+If your interface can create downloadable files, create that file for download. Otherwise return
+only its complete raw YAML contents. Do not include analysis, commentary, Markdown fences, or a
+second artifact outside the requested file.
+
+The file must contain the complete scene plan under the key `scenes`. Each item should contain
+`id`, `title`, `purpose`, `characters` (character IDs), `events`, `comic_function`, `constraints`,
+and `locked`.
 
 ## Project
 

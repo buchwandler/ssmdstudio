@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from .models import Character, Feedback, ProjectConfig, Scene
 from .project import Studio
+from .workspace import Workspace
 
 try:
     __version__ = version("ssmdstudio")
@@ -16,5 +17,6 @@ __all__ = [
     "ProjectConfig",
     "Scene",
     "Studio",
+    "Workspace",
     "__version__",
 ]

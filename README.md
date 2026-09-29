@@ -1,146 +1,135 @@
 # ssmdstudio
 
-`ssmdstudio` is a small Python framework and CLI for building **structured authoring
-projects** that an LLM can turn into SSMD.
-
-The project store is the source of truth. Characters, scenes, human feedback, prompts,
-drafts, and generated SSMD stay separate so a human can revise one part without
-reconstructing the whole creative brief from chat history.
-
-This MVP starts with one recipe: `funny-story`.
+`ssmdstudio` is a small Python framework and CLI for building structured authoring projects
+that an LLM or harness can turn into SSMD. Characters, scenes, feedback, prompts, drafts, and
+output live in a filesystem-backed project store. The store is the source of truth, not chat
+history.
 
 ## Design boundary
 
-`ssmdstudio` creates and manages authoring state and compiles prompts.
+SSMD Studio stores authoring state, compiles provider-neutral prompts, and applies returned files.
+A human or harness executes the prompts. SSMD Studio does not call model providers or render
+audio. The optional `ssmd` runtime validates the final document when installed.
 
-It deliberately does **not** call a model provider and does not render audio. A human,
-agent harness, CI job, or model-specific adapter can execute the generated prompts.
-The final `.ssmd.md` can then be consumed by Readio or another SSMD-compatible runtime.
+## Standalone projects and workspaces
 
-## Layout
-
-There is intentionally **no `src/` directory**:
-
-```text
-ssmdstudio/
-├── pyproject.toml
-├── ssmdstudio/
-│   ├── cli.py
-│   ├── models.py
-│   ├── project.py
-│   ├── prompts.py
-│   ├── store.py
-│   └── resources/
-├── skill/ssmdstudio/SKILL.md
-└── tests/
-```
-
-Versioning is dynamic through `setuptools-scm`. In a Git checkout, tags drive package
-versions. For example, tag `v0.1.0` produces version `0.1.0`. A source tree without Git
-metadata falls back to `0+unknown`.
-
-## Install for development
-
-```bash
-python -m pip install -e ".[dev]"
-```
-
-## Quick start
+A standalone project remains the simplest option and keeps the original flat layout:
 
 ```bash
 ssmdstudio init picnic --title "The Picnic Problem" --brief \
-  "Anna tries to prepare a picnic before her friends arrive, while a curious dog steals napkins."
-
+  "Anna prepares a picnic while a curious dog keeps stealing napkins."
 cd picnic
-
-ssmdstudio character add anna \
-  --name Anna \
-  --role protagonist \
-  --description "Organized and patient; increasingly baffled by the missing napkins." \
-  --trait organized --trait patient \
-  --voice-notes "Warm, natural, restrained dry humor" \
-  --ssmd-role host
-
-ssmdstudio character add dog \
-  --name "Milo the dog" \
-  --role counterpart \
-  --description "Curious, harmless, and convinced loose napkins are toys." \
-  --trait curious --trait harmless
-
-ssmdstudio scene add setup \
-  --title "The first missing napkin" \
-  --purpose "Introduce Anna's ordinary goal and the running problem." \
-  --character anna --character dog \
-  --event "Anna lays out the picnic." \
-  --event "The dog quietly takes one napkin." \
-  --event "Anna notices that something is missing."
-
-ssmdstudio prompt build scenes --save --output prompt-scenes.md
-```
-
-Give `prompt-scenes.md` to an LLM. The prompt returns a `scenes:` YAML list, which can be
-imported directly:
-
-```bash
-ssmdstudio scene import scenes.yaml
-```
-
-The same round-trip works for characters:
-
-```bash
-ssmdstudio prompt build characters --save --output prompt-characters.md
-# execute the prompt with your LLM and save its YAML response
-ssmdstudio character import characters.yaml
-```
-
-Build the plain-story draft prompt:
-
-```bash
-ssmdstudio prompt build draft --save --output prompt-draft.md
-```
-
-After the LLM writes the story:
-
-```bash
-ssmdstudio draft set draft.md
-```
-
-Add human feedback:
-
-```bash
-ssmdstudio feedback add slower-middle \
-  --scope scene:escalation \
-  --instruction "The escalation is too fast; add one smaller failure first." \
-  --lock scene:payoff
-```
-
-Build a revision prompt:
-
-```bash
-ssmdstudio prompt build revise --save --output prompt-revise.md
-```
-
-When the prose draft is approved, compile the SSMD prompt:
-
-```bash
-ssmdstudio prompt build ssmd --save --output prompt-ssmd.md
-```
-
-Import the generated SSMD artifact:
-
-```bash
-ssmdstudio output set story.ssmd.md
-```
-
-Inspect the project:
-
-```bash
 ssmdstudio status
 ```
 
+A workspace is an optional collection for multiple stories. It keeps projects as siblings under
+`projects/`, with workspace selection stored in `.ssmdstudio/workspace.yaml`:
+
+```text
+my-stories/
+├── .ssmdstudio/workspace.yaml
+└── projects/
+    ├── printer-story/
+    └── picnic/
+```
+
+Create and select workspace projects with:
+
+```bash
+ssmdstudio workspace init
+ssmdstudio project create printer-story \
+  --title "Funny printer story" \
+  --brief "A person tries to print while the printer develops a bureaucratic personality."
+ssmdstudio project list
+ssmdstudio project use printer-story
+ssmdstudio project show
+```
+
+The active project is a convenience. Scriptable commands can use `--project ID` or a project
+path to select a project explicitly. Existing standalone directories continue to work with
+`Studio.open(PATH)` and the original `ssmdstudio init PATH` command. Nested projects are refused
+by default; `--allow-nested` is an explicit override.
+
+## Two authoring workflows
+
+Both workflows use the same project store, prompt builders, and `apply` command.
+
+### Manual / copy prompt
+
+Use this when the user wants to run prompts in another chat or model UI. This mode does not ask
+the harness to spend generation tokens:
+
+```bash
+ssmdstudio next
+ssmdstudio prompt next --save
+# Run the saved prompt elsewhere and save the response under its requested filename.
+ssmdstudio apply characters.yaml
+ssmdstudio next
+ssmdstudio prompt next --save
+ssmdstudio apply scenes.yaml
+ssmdstudio prompt next --save
+ssmdstudio apply draft.md
+ssmdstudio prompt next --save
+ssmdstudio apply printer-story.ssmd.md
+```
+
+`next` reports the stage, expected artifact, saved prompt when available, and the next command.
+Every prompt requests a downloadable file when supported, or complete raw file contents otherwise.
+The expected filenames are `characters.yaml`, `scenes.yaml`, `draft.md`, and
+`<project-id>.ssmd.md`.
+
+### Harness / skill
+
+Use this when the user asks a harness to create the story. The harness runs the same compiled
+prompts and applies its responses through SSMD Studio. It should pause for approval after the
+character and scene checkpoints, present the draft for review, record requested edits as feedback,
+and use targeted revisions before converting approved prose to SSMD.
+
+The skill is bundled in the wheel and can be shown, located, or installed into a directory chosen
+by the user or harness:
+
+```bash
+ssmdstudio skill show
+ssmdstudio skill path
+ssmdstudio skill install ~/.agents/skills/ssmdstudio
+```
+
+The install command writes `SKILL.md` under the specified directory. SSMD Studio does not choose a
+vendor-specific global skills directory.
+
+## Prompt and artifact workflow
+
+`ssmdstudio prompt build STAGE --save` remains available for explicit stage selection. The guided
+alternative is:
+
+```bash
+ssmdstudio next
+ssmdstudio prompt next --save
+ssmdstudio apply FILE
+```
+
+`apply` infers the waiting stage from stored state, checks the expected filename and file format,
+updates the store, and records the response in the latest matching prompt run. Use `--stage` only
+when explicitly overriding the inferred stage. Character and scene imports replace the complete
+stored set atomically by default. The lower-level commands accept `--merge` for preserving
+unspecified existing entities.
+
+The workflow proceeds through characters, scenes, draft, optional revise stages for open
+feedback, SSMD conversion, and completion. A draft without open feedback is considered approved
+for the MVP. The SSMD conversion prompt treats the approved draft as locked wording and uses a
+compact speaker map, including an explicit narrator role when present.
+
+## Validation
+
+Storing SSMD and validating SSMD are separate operations. `ssmdstudio output validate` uses the
+installed `ssmd` runtime when available and reports passed, failed, or unavailable. SSMD Studio
+does not claim validation when the runtime did not run, and it does not add `ssmd` as a required
+dependency.
+The result is stored at `output/validation.json` and tied to a content hash. `status` shows `stale` if the SSMD changes after validation.
+
 ## Project store
 
-A project is plain YAML and Markdown:
+A standalone project contains plain YAML and Markdown:
 
 ```text
 project.yaml
@@ -149,59 +138,41 @@ scenes/
 feedback/
 drafts/current.md
 output/current.ssmd.md
+output/validation.json
 runs/
 ```
 
-The format is deliberately boring: human-readable, Git-friendly, and easy for agents
-to modify with normal filesystem tools.
+Prompt runs store the generated prompt and a manifest containing the input fingerprint, expected
+artifact, and response provenance. `ssmdstudio status` reports inventory, next stage, prompt
+staleness, and current validation state.
 
 ## Python API
 
 ```python
-from ssmdstudio import Studio
+from ssmdstudio import Studio, Workspace
 
-studio = Studio.open("picnic")
-
-studio.add_character(
-    id="jo",
-    name="Jo",
-    role="friend",
-    description="Arrives halfway through and notices the pattern.",
-    traits=["observant"],
-    voice_notes="Friendly and matter-of-fact",
-    ssmd_role="guest",
-)
-
-studio.add_scene(
-    id="arrival",
-    title="Jo arrives",
-    purpose="Let another person recognize the running gag.",
-    characters=["anna", "jo", "dog"],
-    events=["Jo arrives.", "The dog passes carrying another napkin."],
-)
-
-prompt = studio.build_prompt("draft")
+workspace = Workspace.open("my-stories")
+studio = workspace.resolve_project("printer-story")
+prompt = studio.build_prompt("characters")
 print(prompt)
 ```
 
-## Prompt runs and staleness
+For a standalone project, use `Studio.open("picnic")`. The Python API and CLI share the same
+filesystem-backed state.
 
-`ssmdstudio prompt build ... --save` stores the prompt and a manifest under `runs/`.
-The manifest contains a SHA-256 fingerprint of the inputs used for that prompt.
+## Development
 
-If characters, scenes, the brief, feedback, or draft change later, `ssmdstudio status`
-marks previous prompt runs as `stale`. This is a small but useful dependency mechanism
-without requiring a database or workflow engine.
+There is intentionally no `src/` directory. Versioning is dynamic through `setuptools-scm`.
 
-## MVP non-goals
+```bash
+python -m pip install -e ".[dev]"
+pytest -q
+ruff check .
+python -m build --wheel
+```
 
-The MVP intentionally does not:
+## Non-goals
 
-- call OpenAI, Anthropic, Gemini, or another provider;
-- render audio;
-- bind concrete TTS voices;
-- provide a GUI;
-- implement every Readio authoring recipe;
-- attempt automatic semantic merges of model output.
-
-Those can be layered on the stable project/store/prompt API later.
+SSMD Studio does not include model-provider clients, a database, a GUI, audio rendering, concrete
+provider voice IDs, semantic merge machinery, or background jobs. The SSMD runtime owns final
+validation, binding, and rendering.

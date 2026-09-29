@@ -36,6 +36,7 @@ exclude = ["tests*", "skill*"]
 ssmdstudio = [
   "py.typed",
   "resources/prompts/funny-story/*.md",
+  "resources/skills/ssmdstudio/SKILL.md",
 ]
 
 [tool.setuptools_scm]

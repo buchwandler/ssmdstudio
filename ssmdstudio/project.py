@@ -1,13 +1,25 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from collections.abc import Iterable
+from uuid import uuid4
 
-from .models import Character, Feedback, ProjectConfig, Scene, SSMDRole
-from .prompts import STAGES, render_template
+from .models import (
+    Character,
+    Feedback,
+    ProjectConfig,
+    Scene,
+    SSMDRole,
+    validate_ssmd_role,
+)
+from .prompts import STAGES, STAGE_SPECS, render_template
 from .store import (
     atomic_write_text,
     dump_yaml,
@@ -40,10 +52,18 @@ class Studio:
         tone: str = "warm comic",
         duration_minutes: float | None = None,
         constraints: list[str] | None = None,
+        allow_nested: bool = False,
     ) -> Studio:
         root = Path(path).resolve()
         if (root / "project.yaml").exists():
             raise FileExistsError(f"project already exists at {root}")
+        if not allow_nested:
+            for ancestor in root.parents:
+                if (ancestor / "project.yaml").is_file():
+                    raise ValueError(
+                        f"refusing to create an SSMD Studio project inside existing project {ancestor}\n"
+                        "hint: create a sibling project, use a workspace, or pass --allow-nested"
+                    )
         if recipe != "funny-story":
             raise ValueError("the MVP currently supports only recipe='funny-story'")
 
@@ -109,12 +129,14 @@ class Studio:
             constraints=constraints or [],
         )
         if ssmd_role is not None:
+            validate_ssmd_role(ssmd_role)
             self._ensure_unique_ssmd_role(character.id, ssmd_role)
         write_yaml(self.root / "characters" / f"{character.id}.yaml", character.to_dict())
         return character
 
     def put_character(self, character: Character) -> None:
         if character.ssmd_role is not None:
+            validate_ssmd_role(character.ssmd_role)
             self._ensure_unique_ssmd_role(character.id, character.ssmd_role)
         write_yaml(self.root / "characters" / f"{character.id}.yaml", character.to_dict())
 
@@ -131,20 +153,91 @@ class Studio:
             for path in sorted((self.root / "characters").glob("*.yaml"))
         ]
 
-    def import_characters(self, source: str | Path) -> list[Character]:
+    @staticmethod
+    def _canonical_id(value: object, entity: str) -> str:
+        if not isinstance(value, str) or not value or slugify(value) != value:
+            raise ValueError(f"{entity} ID must be lowercase kebab-case")
+        return value
+
+    @staticmethod
+    def _require_fields(item: dict[str, Any], fields: tuple[str, ...], entity: str) -> None:
+        missing = [
+            name for name in fields if not isinstance(item.get(name), str) or not item[name].strip()
+        ]
+        if missing:
+            raise ValueError(f"{entity} requires non-empty fields: {', '.join(missing)}")
+
+    @staticmethod
+    def _validate_list_fields(item: dict[str, Any], fields: tuple[str, ...], entity: str) -> None:
+        for name in fields:
+            values = item.get(name, [])
+            if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+                raise ValueError(f"{entity} field {name!r} must be a list of strings")
+
+    @staticmethod
+    def _validate_character_set(characters: list[Character]) -> None:
+        ids: set[str] = set()
+        roles: set[str] = set()
+        for character in characters:
+            if character.id in ids:
+                raise ValueError(f"duplicate character ID {character.id!r}")
+            ids.add(character.id)
+            if character.ssmd_role is not None:
+                validate_ssmd_role(character.ssmd_role)
+                if character.ssmd_role in roles:
+                    raise ValueError(f"duplicate SSMD role {character.ssmd_role!r}")
+                roles.add(character.ssmd_role)
+
+    def _replace_entity_set(self, directory: str, items: list[Character] | list[Scene]) -> None:
+        target = self.root / directory
+        staging = Path(tempfile.mkdtemp(prefix=f".{directory}-", dir=self.root))
+        backup = self.root / f".{directory}-backup-{uuid4().hex}"
+        try:
+            for item in items:
+                write_yaml(staging / f"{item.id}.yaml", item.to_dict())
+            if target.exists():
+                os.replace(target, backup)
+            try:
+                os.replace(staging, target)
+            except Exception:
+                if backup.exists():
+                    os.replace(backup, target)
+                raise
+            if backup.exists():
+                shutil.rmtree(backup)
+        finally:
+            if staging.exists():
+                shutil.rmtree(staging)
+
+    def import_characters(self, source: str | Path, *, merge: bool = False) -> list[Character]:
         import yaml
 
-        data = yaml.safe_load(Path(source).read_text(encoding="utf-8"))
+        try:
+            data = yaml.safe_load(Path(source).read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            raise ValueError(f"invalid character YAML: {exc}") from exc
         if not isinstance(data, dict) or not isinstance(data.get("characters"), list):
             raise ValueError("character import expects a YAML mapping with a 'characters' list")
         imported: list[Character] = []
         for item in data["characters"]:
             if not isinstance(item, dict):
                 raise ValueError("every imported character must be a YAML mapping")
+            self._require_fields(item, ("id", "name", "role", "description"), "character")
+            self._validate_list_fields(item, ("traits", "goals", "constraints"), "character")
+            character_id = self._canonical_id(item["id"], "character")
             character = Character.from_dict(item)
-            character.id = slugify(character.id)
-            self.put_character(character)
+            character.id = character_id
             imported.append(character)
+        self._validate_character_set(imported)
+
+        if merge:
+            combined = {item.id: item for item in self.characters()}
+            combined.update({item.id: item for item in imported})
+            result = list(combined.values())
+            self._validate_character_set(result)
+        else:
+            result = imported
+        self._replace_entity_set("characters", result)
         return imported
 
     def add_scene(
@@ -185,27 +278,53 @@ class Studio:
             for path in sorted((self.root / "scenes").glob("*.yaml"))
         ]
 
-    def import_scenes(self, source: str | Path) -> list[Scene]:
+    @staticmethod
+    def _validate_scene_set(scenes: list[Scene], character_ids: set[str]) -> None:
+        ids: set[str] = set()
+        for scene in scenes:
+            if scene.id in ids:
+                raise ValueError(f"duplicate scene ID {scene.id!r}")
+            ids.add(scene.id)
+            unknown = sorted(set(scene.characters) - character_ids)
+            if unknown:
+                raise ValueError(
+                    f"scene {scene.id!r} references unknown character(s): {', '.join(unknown)}"
+                )
+
+    def import_scenes(self, source: str | Path, *, merge: bool = False) -> list[Scene]:
         import yaml
 
-        data = yaml.safe_load(Path(source).read_text(encoding="utf-8"))
+        try:
+            data = yaml.safe_load(Path(source).read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            raise ValueError(f"invalid scene YAML: {exc}") from exc
         if not isinstance(data, dict) or not isinstance(data.get("scenes"), list):
             raise ValueError("scene import expects a YAML mapping with a 'scenes' list")
         imported: list[Scene] = []
         for item in data["scenes"]:
             if not isinstance(item, dict):
                 raise ValueError("every imported scene must be a YAML mapping")
+            self._require_fields(item, ("id", "title", "purpose"), "scene")
+            self._validate_list_fields(item, ("characters", "events", "constraints"), "scene")
+            scene_id = self._canonical_id(item["id"], "scene")
             scene = Scene.from_dict(item)
-            scene.id = slugify(scene.id)
-            scene.characters = [slugify(value) for value in scene.characters]
-            known = {character.id for character in self.characters()}
-            unknown = sorted(set(scene.characters) - known)
-            if unknown:
-                raise ValueError(
-                    f"scene {scene.id!r} references unknown character(s): {', '.join(unknown)}"
-                )
-            self.put_scene(scene)
+            scene.id = scene_id
+            scene.characters = [
+                self._canonical_id(value, "scene character reference") for value in scene.characters
+            ]
+            if "locked" in item and not isinstance(item["locked"], bool):
+                raise ValueError("scene field 'locked' must be a boolean")
             imported.append(scene)
+
+        character_ids = {item.id for item in self.characters()}
+        if merge:
+            combined = {item.id: item for item in self.scenes()}
+            combined.update({item.id: item for item in imported})
+            result = list(combined.values())
+        else:
+            result = imported
+        self._validate_scene_set(result, character_ids)
+        self._replace_entity_set("scenes", result)
         return imported
 
     def add_feedback(
@@ -256,46 +375,261 @@ class Studio:
         path = self.root / "output" / "current.ssmd.md"
         return path.read_text(encoding="utf-8") if path.is_file() else ""
 
-    def _context_project(self) -> str:
-        return dump_yaml(self.config.to_dict()).strip()
+    def validate_output(self) -> dict[str, Any]:
+        output = self.root / "output" / "current.ssmd.md"
+        if not output.is_file():
+            raise FileNotFoundError("no SSMD output to validate")
+        output_hash = hashlib.sha256(output.read_bytes()).hexdigest()
+        validator = shutil.which("ssmd")
+        checked_at = datetime.now(timezone.utc).isoformat()
+        if validator is None:
+            result: dict[str, Any] = {
+                "state": "unavailable",
+                "path": "output/current.ssmd.md",
+                "message": "ssmd runtime is not installed",
+                "command": None,
+                "returncode": None,
+                "stdout": "",
+                "stderr": "",
+            }
+        else:
+            command = [
+                validator,
+                "--json",
+                "lint",
+                "output/current.ssmd.md",
+                "--roundtrip",
+                "--fail-on-warn",
+            ]
+            completed = subprocess.run(
+                command,
+                cwd=self.root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            result = {
+                "state": "passed" if completed.returncode == 0 else "failed",
+                "path": "output/current.ssmd.md",
+                "command": command,
+                "returncode": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            }
+        result["checked_at"] = checked_at
+        result["output_sha256"] = output_hash
+        write_json(self.root / "output" / "validation.json", result)
+        return result
+
+    def validation_status(self) -> str:
+        record_path = self.root / "output" / "validation.json"
+        if not record_path.is_file():
+            return "not_run"
+        output = self.root / "output" / "current.ssmd.md"
+        if not output.is_file():
+            return "stale"
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        output_hash = hashlib.sha256(output.read_bytes()).hexdigest()
+        if record.get("output_sha256") != output_hash:
+            return "stale"
+        return str(record["state"])
+
+    def _workflow_state(self) -> dict[str, bool]:
+        characters = bool(self.characters())
+        scenes = bool(self.scenes())
+        draft = bool(self.draft_text())
+        open_feedback = bool(self.feedback(open_only=True))
+        output = (self.root / "output" / "current.ssmd.md").is_file()
+        return {
+            "characters": characters,
+            "scenes": scenes,
+            "draft": draft,
+            "open_feedback": open_feedback,
+            "approved_draft": draft and not open_feedback,
+            "output": output,
+        }
+
+    def next_stage(self) -> str | None:
+        state = self._workflow_state()
+        if state["output"]:
+            return None
+        for stage in STAGES:
+            spec = STAGE_SPECS[stage]
+            if stage == "revise":
+                if all(state[name] for name in spec.prerequisites):
+                    return stage
+            elif stage == "ssmd":
+                if all(state[name] for name in spec.prerequisites):
+                    return stage
+            elif not state[stage] and all(state[name] for name in spec.prerequisites):
+                return stage
+        return None
+
+    def _apply_snapshot(self, stage: str) -> dict[str, bytes]:
+        directories = {
+            "characters": ("characters",),
+            "scenes": ("scenes",),
+            "draft": ("drafts",),
+            "revise": ("drafts", "feedback"),
+            "ssmd": ("output",),
+        }[stage]
+        snapshot: dict[str, bytes] = {}
+        for directory in directories:
+            for path in sorted((self.root / directory).glob("*")):
+                if path.is_file():
+                    snapshot[path.relative_to(self.root).as_posix()] = path.read_bytes()
+        return snapshot
+
+    def _latest_run_dir(self, stage: str) -> Path | None:
+        for manifest in sorted((self.root / "runs").glob("*/manifest.json"), reverse=True):
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+            if data.get("stage") == stage:
+                return manifest.parent
+        return None
+
+    def apply(self, source: str | Path, *, stage: str | None = None) -> dict[str, Any]:
+        response_path = Path(source)
+        if not response_path.is_file():
+            raise FileNotFoundError(response_path)
+        if stage is None:
+            stage = self.next_stage()
+            if stage is None:
+                raise ValueError("project is complete; no stage is waiting for an artifact")
+        elif stage not in STAGE_SPECS:
+            raise ValueError(f"unknown stage {stage!r}; choose from {', '.join(STAGES)}")
+
+        expected_artifact = STAGE_SPECS[stage].expected_artifact(self.config.id)
+        if response_path.name != expected_artifact:
+            raise ValueError(
+                f"stage {stage!r} expects artifact {expected_artifact!r}, got {response_path.name!r}"
+            )
+        before = self._apply_snapshot(stage)
+        action = STAGE_SPECS[stage].apply_action
+        if action == "characters":
+            self.import_characters(response_path)
+        elif action == "scenes":
+            self.import_scenes(response_path)
+        elif action == "draft":
+            self.set_draft(response_path)
+            if stage == "revise":
+                for feedback_path in sorted((self.root / "feedback").glob("*.yaml")):
+                    feedback = Feedback.from_dict(load_yaml(feedback_path))
+                    if feedback.status == "open":
+                        feedback.status = "applied"
+                        write_yaml(feedback_path, feedback.to_dict())
+        elif action == "output":
+            self.set_output(response_path)
+        else:
+            raise ValueError(f"stage {stage!r} has unsupported apply action {action!r}")
+
+        after = self._apply_snapshot(stage)
+        changed_files = sorted(
+            path for path in before.keys() | after.keys() if before.get(path) != after.get(path)
+        )
+        run_dir = self._latest_run_dir(stage)
+        response_file = None
+        if run_dir is not None:
+            suffix = {"yaml": ".yaml", "markdown": ".md", "ssmd": ".ssmd.md"}[
+                STAGE_SPECS[stage].artifact_kind
+            ]
+            response_file = run_dir / f"response{suffix}"
+            if response_path.resolve() != response_file.resolve():
+                shutil.copyfile(response_path, response_file)
+            manifest_path = run_dir / "manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["response_file"] = response_file.name
+            manifest["applied_at"] = datetime.now(timezone.utc).isoformat()
+            manifest["changed_files"] = changed_files
+            write_json(manifest_path, manifest)
+
+        return {
+            "stage": stage,
+            "expected_artifact": expected_artifact,
+            "changed_files": changed_files,
+            "run": run_dir.name if run_dir is not None else None,
+            "response_file": response_file.name if response_file is not None else None,
+        }
+
+    def _context_project(self, *, compact: bool = False) -> str:
+        data = self.config.to_prompt_dict()
+        if compact:
+            data = {
+                key: data[key]
+                for key in ("id", "title", "language", "recipe", "constraints")
+                if key in data
+            }
+        return dump_yaml(data).strip()
 
     def _context_characters(self) -> str:
         characters = self.characters()
         if not characters:
             return "(none yet)"
-        return "\n---\n".join(dump_yaml(item.to_dict()).strip() for item in characters)
+        return "\n---\n".join(dump_yaml(item.to_prompt_dict()).strip() for item in characters)
+
+    def _context_speakers(self) -> str:
+        speakers = [
+            {
+                "id": item.id,
+                "name": item.name,
+                "ssmd_role": item.ssmd_role,
+                "voice_notes": item.voice_notes,
+            }
+            for item in self.characters()
+            if item.ssmd_role is not None
+        ]
+        if not speakers:
+            return "(no symbolic speakers assigned)"
+        return dump_yaml({"speakers": speakers}).strip()
 
     def _context_scenes(self) -> str:
         scenes = self.scenes()
         if not scenes:
             return "(none yet)"
-        return "\n---\n".join(dump_yaml(item.to_dict()).strip() for item in scenes)
+        return "\n---\n".join(dump_yaml(item.to_prompt_dict()).strip() for item in scenes)
 
     def _context_feedback(self) -> str:
         feedback = self.feedback(open_only=True)
         if not feedback:
             return "(no open feedback)"
-        return "\n---\n".join(dump_yaml(item.to_dict()).strip() for item in feedback)
+        records = []
+        for item in feedback:
+            record = item.to_dict()
+            record.pop("schema")
+            records.append(dump_yaml(record).strip())
+        return "\n---\n".join(records)
 
     def build_prompt(self, stage: str) -> str:
         if stage not in STAGES:
             raise ValueError(f"unknown stage {stage!r}; choose from {', '.join(STAGES)}")
-        if stage in {"draft", "revise", "ssmd"} and not self.scenes():
-            raise ValueError(f"stage {stage!r} requires at least one scene")
-        if stage == "revise" and not self.draft_text():
-            raise ValueError("revision requires drafts/current.md")
-        if stage == "ssmd" and not self.draft_text():
-            raise ValueError("SSMD generation requires drafts/current.md")
+        state = self._workflow_state()
+        missing = [name for name in STAGE_SPECS[stage].prerequisites if not state[name]]
+        if missing:
+            prerequisite = missing[0]
+            if prerequisite == "scenes":
+                raise ValueError(f"stage {stage!r} requires at least one scene")
+            if prerequisite == "characters":
+                raise ValueError(f"stage {stage!r} requires at least one character")
+            if prerequisite == "draft":
+                raise ValueError(f"{stage} generation requires drafts/current.md")
+            if prerequisite == "open_feedback":
+                raise ValueError("revision requires open feedback")
+            if prerequisite == "approved_draft":
+                if not state["draft"]:
+                    raise ValueError("SSMD generation requires drafts/current.md")
+                raise ValueError("SSMD generation requires a draft with no open feedback")
+            raise ValueError(f"stage {stage!r} is missing prerequisite {prerequisite!r}")
 
         return (
             render_template(
                 stage,
                 {
-                    "PROJECT": self._context_project(),
+                    "PROJECT": self._context_project(compact=stage == "ssmd"),
                     "CHARACTERS": self._context_characters(),
+                    "SPEAKERS": self._context_speakers(),
                     "SCENES": self._context_scenes(),
                     "FEEDBACK": self._context_feedback(),
                     "DRAFT": self.draft_text() or "(no draft yet)",
+                    "ARTIFACT_NAME": STAGE_SPECS[stage].expected_artifact(self.config.id),
                 },
             ).rstrip()
             + "\n"
@@ -303,19 +637,20 @@ class Studio:
 
     def _stage_input_paths(self, stage: str) -> list[Path]:
         paths = [self.root / "project.yaml"]
-        # Keep this list aligned with the contexts inserted by build_prompt().
         paths.extend(sorted((self.root / "characters").glob("*.yaml")))
-        if stage in {"scenes", "draft", "revise", "ssmd"}:
+        if stage in {"draft", "revise"}:
             paths.extend(sorted((self.root / "scenes").glob("*.yaml")))
+        if stage == "revise":
+            paths.extend(sorted((self.root / "feedback").glob("*.yaml")))
         if stage in {"revise", "ssmd"}:
             draft = self.root / "drafts" / "current.md"
             if draft.is_file():
                 paths.append(draft)
-        if stage == "revise":
-            paths.extend(sorted((self.root / "feedback").glob("*.yaml")))
         return paths
 
     def save_prompt_run(self, stage: str, prompt: str | None = None) -> Path:
+        if stage not in STAGE_SPECS:
+            raise ValueError(f"unknown prompt stage {stage!r}; choose from {', '.join(STAGES)}")
         prompt = prompt if prompt is not None else self.build_prompt(stage)
         fingerprint, inputs = hash_files(self._stage_input_paths(stage), root=self.root)
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
@@ -327,9 +662,13 @@ class Studio:
             {
                 "schema": "ssmdstudio.run.v1",
                 "stage": stage,
+                "expected_artifact": STAGE_SPECS[stage].expected_artifact(self.config.id),
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "input_fingerprint": fingerprint,
                 "inputs": inputs,
+                "response_file": None,
+                "applied_at": None,
+                "changed_files": [],
             },
         )
         return run_dir
@@ -365,5 +704,7 @@ class Studio:
             "open_feedback": len(self.feedback(open_only=True)),
             "draft": (self.root / "drafts" / "current.md").is_file(),
             "output": (self.root / "output" / "current.ssmd.md").is_file(),
+            "validation": self.validation_status(),
+            "next_stage": self.next_stage(),
             "runs": self.run_statuses(),
         }

@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
-SSMDRole = Literal["narrator", "host", "guest", "analyst"]
+SSMDRole = str
+_ROLE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+
+
+def validate_ssmd_role(role: object) -> str:
+    if not isinstance(role, str) or not _ROLE_RE.fullmatch(role):
+        raise ValueError("SSMD role must be a non-empty symbolic identifier without whitespace")
+    return role
 
 
 def _clean_strings(values: list[str] | None) -> list[str]:
@@ -26,6 +34,11 @@ class ProjectConfig:
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
         data["constraints"] = _clean_strings(self.constraints)
+        return data
+
+    def to_prompt_dict(self) -> dict[str, Any]:
+        data = self.to_dict()
+        data.pop("schema")
         return data
 
     @classmethod
@@ -68,8 +81,14 @@ class Character:
         data["constraints"] = _clean_strings(self.constraints)
         return data
 
+    def to_prompt_dict(self) -> dict[str, Any]:
+        data = self.to_dict()
+        data.pop("schema")
+        return data
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Character:
+        role = data.get("ssmd_role")
         return cls(
             id=str(data["id"]),
             name=str(data["name"]),
@@ -78,7 +97,7 @@ class Character:
             traits=_clean_strings(data.get("traits")),
             goals=_clean_strings(data.get("goals")),
             voice_notes=str(data.get("voice_notes", "")),
-            ssmd_role=data.get("ssmd_role"),
+            ssmd_role=validate_ssmd_role(role) if role is not None else None,
             constraints=_clean_strings(data.get("constraints")),
             schema=str(data.get("schema", "ssmdstudio.character.v1")),
         )
@@ -101,6 +120,11 @@ class Scene:
         data["characters"] = _clean_strings(self.characters)
         data["events"] = _clean_strings(self.events)
         data["constraints"] = _clean_strings(self.constraints)
+        return data
+
+    def to_prompt_dict(self) -> dict[str, Any]:
+        data = self.to_dict()
+        data.pop("schema")
         return data
 
     @classmethod
