@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm>=9.2", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ssmdstudio"
+dynamic = ["version"]
+description = "Structured, human-reviewable authoring projects for generating SSMD with LLMs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [
+  {name = "Buchwandler"}
+]
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2",
+  "pytest>=8",
+  "ruff>=0.6",
+  "mypy>=1.10",
+]
+
+[project.scripts]
+ssmdstudio = "ssmdstudio.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ssmdstudio*"]
+exclude = ["tests*", "skill*"]
+
+[tool.setuptools.package-data]
+ssmdstudio = [
+  "py.typed",
+  "resources/prompts/funny-story/*.md",
+]
+
+[tool.setuptools_scm]
+fallback_version = "0+unknown"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

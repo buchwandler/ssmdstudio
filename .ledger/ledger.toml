@@ -1,0 +1,18 @@
+schema_version = 3
+
+[project]
+uuid = "f3711004-0315-43f1-91f3-270ac4f5832d"
+name = "ssmdstudio"
+
+[ledgers.taskledger.mounts.data]
+storage = "external"
+root = "../ledger"
+
+[ledgers.taskledger.mounts.runtime]
+storage = "user-data"
+
+[ledgers.taskledger.mounts.logs]
+storage = "user-data"
+
+[ledgers.taskledger.mounts.indexes]
+storage = "cache"

@@ -1,0 +1,13 @@
+schema: ssmdstudio.character.v1
+id: anna
+name: Anna
+role: protagonist
+description: Organized and patient, increasingly baffled by missing napkins.
+traits:
+  - organized
+  - patient
+goals:
+  - Finish setting up the picnic before friends arrive.
+voice_notes: Warm, conversational, restrained dry humor.
+ssmd_role: host
+constraints: []
