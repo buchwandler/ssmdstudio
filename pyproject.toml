@@ -28,6 +28,9 @@ dev = [
 [project.scripts]
 ssmdstudio = "ssmdstudio.cli:main"
 
+[tool.setuptools]
+include-package-data = false
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["ssmdstudio*"]

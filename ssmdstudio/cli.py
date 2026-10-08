@@ -293,7 +293,7 @@ def _parse_voice_bindings(values: list[str]) -> dict[str, str]:
 
 def _run_ssmd_command(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     if args.ssmd_command == "bind":
-        result = materialize_voice_bindings(
+        binding_result = materialize_voice_bindings(
             Path(args.file),
             _parse_voice_bindings(args.voice_bind),
             provider=args.provider,
@@ -302,12 +302,12 @@ def _run_ssmd_command(args: argparse.Namespace, parser: argparse.ArgumentParser)
             force=args.force,
         )
         if args.json:
-            print(json.dumps(result.to_dict(), ensure_ascii=False))
+            print(json.dumps(binding_result.to_dict(), ensure_ascii=False))
         else:
-            print(result.output)
+            print(binding_result.output)
         return
     if args.ssmd_command == "lint":
-        result = check_ssmd(
+        validation_result = check_ssmd(
             Path(args.file),
             roundtrip=args.roundtrip,
             fail_on_warn=args.fail_on_warn,
@@ -315,25 +315,27 @@ def _run_ssmd_command(args: argparse.Namespace, parser: argparse.ArgumentParser)
             dialect=args.dialect,
         )
         if args.json:
-            print(json.dumps(result.to_dict(), ensure_ascii=False))
+            print(json.dumps(validation_result.to_dict(), ensure_ascii=False))
         else:
-            print(f"source: {result.source}")
-            print(f"validation: {result.state}")
-            if result.state == "unavailable":
-                print(result.message or "SSMD validation is unavailable", file=sys.stderr)
-            elif result.ok:
+            print(f"source: {validation_result.source}")
+            print(f"validation: {validation_result.state}")
+            if validation_result.state == "unavailable":
+                print(
+                    validation_result.message or "SSMD validation is unavailable", file=sys.stderr
+                )
+            elif validation_result.ok:
                 print("syntax lint: passed")
-                if result.roundtrip:
+                if validation_result.roundtrip:
                     print("round-trip lint: passed")
             else:
-                for diagnostic in result.diagnostics:
+                for diagnostic in validation_result.diagnostics:
                     print(
                         f"{diagnostic.severity}: {diagnostic.message} ({diagnostic.code})",
                         file=sys.stderr,
                     )
-                if result.stderr:
-                    sys.stderr.write(result.stderr)
-        if not result.ok:
+                if validation_result.stderr:
+                    sys.stderr.write(validation_result.stderr)
+        if not validation_result.ok:
             raise SystemExit(1)
         return
     parser.error("unsupported SSMD command")
@@ -482,8 +484,8 @@ def main(argv: list[str] | None = None) -> None:
                 print("no projects")
                 return
             for studio in projects:
-                active = "*" if studio.config.id == workspace.active_project_id else " "
-                print(f"{active} {studio.config.id}\t{studio.config.title}")
+                marker = "*" if studio.config.id == workspace.active_project_id else " "
+                print(f"{marker} {studio.config.id}\t{studio.config.title}")
             return
 
         if args.command == "project" and args.project_command == "use":
@@ -492,8 +494,8 @@ def main(argv: list[str] | None = None) -> None:
             return
 
         if args.command == "project" and args.project_command == "show":
-            studio, active = Workspace.open().show_project(args.project_id)
-            print(f"project: {studio.config.id}{' (active)' if active else ''}")
+            studio, project_active = Workspace.open().show_project(args.project_id)
+            print(f"project: {studio.config.id}{' (active)' if project_active else ''}")
             print(f"root: {studio.root}")
             print(f"title: {studio.config.title}")
             print(f"brief: {studio.config.brief}")
@@ -516,8 +518,8 @@ def main(argv: list[str] | None = None) -> None:
             return
 
         if args.command == "character" and args.character_command == "import":
-            imported = _studio(args.project).import_characters(args.file, merge=args.merge)
-            for character in imported:
+            character_imports = _studio(args.project).import_characters(args.file, merge=args.merge)
+            for character in character_imports:
                 print(character.id)
             return
 
@@ -536,8 +538,8 @@ def main(argv: list[str] | None = None) -> None:
             return
 
         if args.command == "scene" and args.scene_command == "import":
-            imported = _studio(args.project).import_scenes(args.file, merge=args.merge)
-            for scene in imported:
+            scene_imports = _studio(args.project).import_scenes(args.file, merge=args.merge)
+            for scene in scene_imports:
                 print(scene.id)
             return
 

@@ -109,7 +109,7 @@ class ValidationResult:
 
 def _ssmd_api() -> Any:
     try:
-        import ssmd
+        import ssmd  # type: ignore[import-not-found]
     except ImportError as error:
         raise SSMDUnavailableError(
             "SSMD authoring requires the optional dependency ssmd>=0.9.3,<0.10"
@@ -290,7 +290,14 @@ def _cli_diagnostics(
             code = issue.get("code")
             message = issue.get("message")
             line = issue.get("line")
-            if not all(isinstance(value, str) and value for value in (severity, code, message)):
+            if (
+                not isinstance(severity, str)
+                or not severity
+                or not isinstance(code, str)
+                or not code
+                or not isinstance(message, str)
+                or not message
+            ):
                 return (), "ssmd CLI JSON diagnostics require severity, code, and message strings"
             if line is not None and (not isinstance(line, int) or isinstance(line, bool)):
                 return (), "ssmd CLI JSON diagnostic line must be an integer or null"
@@ -458,7 +465,9 @@ def check_ssmd(
 
     if not isinstance(payload, dict) or not isinstance(payload.get("ok"), bool):
         shape_message = "ssmd CLI JSON must be an object with a boolean ok field"
-        diagnostics = (ValidationDiagnostic("error", "ssmd.cli.invalid_json_shape", shape_message),)
+        diagnostics: tuple[ValidationDiagnostic, ...] = (
+            ValidationDiagnostic("error", "ssmd.cli.invalid_json_shape", shape_message),
+        )
         return ValidationResult(
             source=source_path,
             state="failed",
