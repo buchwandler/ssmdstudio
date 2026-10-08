@@ -8,7 +8,9 @@ from pathlib import Path
 from . import __version__
 from .project import Studio
 from .prompts import STAGE_SPECS, STAGES, PromptPack
+from .ssmd import SSMDUnavailableError, check_ssmd, materialize_voice_bindings
 from .store import atomic_write_text
+from .templates import TemplateLibrary, create_empty_draft
 from .workspace import Workspace
 
 
@@ -133,6 +135,60 @@ def _parser() -> argparse.ArgumentParser:
     p_draft_set.add_argument("file")
     p_draft_set.add_argument("--project")
 
+    p_draft_new = draft_sub.add_parser(
+        "new", help="create a standalone empty or template-based draft"
+    )
+    p_draft_new.add_argument("--output", required=True)
+    p_draft_new.add_argument("--template")
+    p_draft_new.add_argument("--force", action="store_true")
+
+    p_template = sub.add_parser("template", help="manage standalone SSMD starter templates")
+    template_sub = p_template.add_subparsers(dest="template_command", required=True)
+    p_template_path = template_sub.add_parser(
+        "path", help="show the template library or a template path"
+    )
+    p_template_path.add_argument("name", nargs="?")
+    p_template_list = template_sub.add_parser("list", help="list user templates")
+    p_template_list.add_argument("--json", action="store_true")
+    p_template_show = template_sub.add_parser("show", help="print a template")
+    p_template_show.add_argument("name")
+    p_template_add = template_sub.add_parser("add", help="add a user template")
+    p_template_add.add_argument("name")
+    p_template_add.add_argument("--file", required=True)
+    p_template_add.add_argument("--force", action="store_true")
+    p_template_remove = template_sub.add_parser("remove", help="remove a user template")
+    p_template_remove.add_argument("name")
+    p_template_reset = template_sub.add_parser("reset", help="restore built-in template defaults")
+    p_template_reset.add_argument("name", nargs="?")
+    p_template_reset.add_argument("--all", action="store_true")
+    p_template_validate = template_sub.add_parser("validate", help="validate one or all templates")
+    p_template_validate.add_argument("name", nargs="?")
+    p_template_validate.add_argument("--all", action="store_true")
+    p_template_validate.add_argument("--roundtrip", action="store_true")
+    p_template_validate.add_argument("--json", action="store_true")
+    p_template_use = template_sub.add_parser("use", help="copy a template to an output file")
+    p_template_use.add_argument("name")
+    p_template_use.add_argument("--output", required=True)
+    p_template_use.add_argument("--force", action="store_true")
+
+    p_ssmd = sub.add_parser("ssmd", help="author and validate standalone SSMD files")
+    ssmd_sub = p_ssmd.add_subparsers(dest="ssmd_command", required=True)
+    p_ssmd_bind = ssmd_sub.add_parser("bind", help="materialize explicit provider voice bindings")
+    p_ssmd_bind.add_argument("file")
+    p_ssmd_bind.add_argument("--provider", required=True)
+    p_ssmd_bind.add_argument("--voice-bind", action="append", required=True, metavar="ROLE=VOICE")
+    p_ssmd_bind.add_argument("--output")
+    p_ssmd_bind.add_argument("--in-place", action="store_true")
+    p_ssmd_bind.add_argument("--force", action="store_true")
+    p_ssmd_bind.add_argument("--json", action="store_true")
+
+    p_ssmd_lint = ssmd_sub.add_parser("lint", help="lint SSMD syntax and optionally roundtrip")
+    p_ssmd_lint.add_argument("file")
+    p_ssmd_lint.add_argument("--roundtrip", action="store_true")
+    p_ssmd_lint.add_argument("--fail-on-warn", action="store_true")
+    p_ssmd_lint.add_argument("--config")
+    p_ssmd_lint.add_argument("--dialect", choices=("auto", "0.8", "0.9"), default="0.9")
+    p_ssmd_lint.add_argument("--json", action="store_true")
     p_output = sub.add_parser("output", help="manage the current generated SSMD")
     output_sub = p_output.add_subparsers(dest="output_command", required=True)
     p_output_set = output_sub.add_parser("set")
@@ -223,11 +279,163 @@ def _show_next(studio: Studio) -> None:
     print(f"  ssmdstudio apply {artifact}")
 
 
+def _parse_voice_bindings(values: list[str]) -> dict[str, str]:
+    bindings: dict[str, str] = {}
+    for value in values:
+        role, separator, voice = value.partition("=")
+        if not separator or not role or not voice:
+            raise ValueError("--voice-bind values must use ROLE=VOICE with non-empty names")
+        if role in bindings and bindings[role] != voice:
+            raise ValueError(f"conflicting --voice-bind values were supplied for role {role!r}")
+        bindings[role] = voice
+    return bindings
+
+
+def _run_ssmd_command(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    if args.ssmd_command == "bind":
+        result = materialize_voice_bindings(
+            Path(args.file),
+            _parse_voice_bindings(args.voice_bind),
+            provider=args.provider,
+            output=Path(args.output) if args.output is not None else None,
+            in_place=args.in_place,
+            force=args.force,
+        )
+        if args.json:
+            print(json.dumps(result.to_dict(), ensure_ascii=False))
+        else:
+            print(result.output)
+        return
+    if args.ssmd_command == "lint":
+        result = check_ssmd(
+            Path(args.file),
+            roundtrip=args.roundtrip,
+            fail_on_warn=args.fail_on_warn,
+            config=Path(args.config) if args.config is not None else None,
+            dialect=args.dialect,
+        )
+        if args.json:
+            print(json.dumps(result.to_dict(), ensure_ascii=False))
+        else:
+            print(f"source: {result.source}")
+            print(f"validation: {result.state}")
+            if result.state == "unavailable":
+                print(result.message or "SSMD validation is unavailable", file=sys.stderr)
+            elif result.ok:
+                print("syntax lint: passed")
+                if result.roundtrip:
+                    print("round-trip lint: passed")
+            else:
+                for diagnostic in result.diagnostics:
+                    print(
+                        f"{diagnostic.severity}: {diagnostic.message} ({diagnostic.code})",
+                        file=sys.stderr,
+                    )
+                if result.stderr:
+                    sys.stderr.write(result.stderr)
+        if not result.ok:
+            raise SystemExit(1)
+        return
+    parser.error("unsupported SSMD command")
+
+
+def _run_template_command(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    library = TemplateLibrary()
+    command = args.template_command
+    if command == "path":
+        print(library.path(args.name) if args.name else library.directory())
+        return
+    if command == "list":
+        names = library.list()
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "schema": "ssmdstudio.templates.v1",
+                        "directory": str(library.directory()),
+                        "templates": list(names),
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            for name in names:
+                print(name)
+        return
+    if command == "show":
+        sys.stdout.write(library.show(args.name))
+        return
+    if command == "add":
+        print(library.add(args.name, source=Path(args.file), force=args.force))
+        return
+    if command == "remove":
+        path = library.path(args.name)
+        library.remove(args.name)
+        print(f"removed {path}")
+        return
+    if command == "reset":
+        for path in library.reset(args.name, all=args.all):
+            print(path)
+        return
+    if command == "use":
+        print(library.use(args.name, output=Path(args.output), force=args.force))
+        return
+    if command == "validate":
+        if args.all and args.name is not None:
+            raise ValueError("template validate accepts a name or --all, not both")
+        if not args.all and args.name is None:
+            raise ValueError("template validate requires NAME or --all")
+        names = library.list() if args.all else (args.name,)
+        results = [library.validate(name, roundtrip=args.roundtrip) for name in names]
+        payloads = [result.to_dict() for result in results]
+        ok = all(result.ok for result in results)
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "schema": "ssmdstudio.template-validation.v1",
+                        "ok": ok,
+                        "templates": payloads,
+                    },
+                    ensure_ascii=False,
+                )
+            )
+        else:
+            for result in results:
+                print(f"{result.source}: {result.state}")
+                for diagnostic in result.diagnostics:
+                    print(f"{diagnostic.severity}: {diagnostic.message}", file=sys.stderr)
+        if not ok:
+            raise SystemExit(1)
+        return
+    parser.error("unsupported template command")
+
+
+def _run_draft_new(args: argparse.Namespace) -> None:
+    if args.template:
+        output = TemplateLibrary().use(args.template, output=Path(args.output), force=args.force)
+    else:
+        output = create_empty_draft(Path(args.output), force=args.force)
+    print(output)
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = _parser()
     args = parser.parse_args(argv)
 
     try:
+        if args.command == "ssmd":
+            _run_ssmd_command(args, parser)
+            return
+
+        if args.command == "template":
+            _run_template_command(args, parser)
+            return
+
+        if args.command == "draft" and args.draft_command == "new":
+            _run_draft_new(args)
+            return
+
         if args.command == "init":
             studio = Studio.init(
                 args.path,
@@ -448,5 +656,17 @@ def main(argv: list[str] | None = None) -> None:
             return
 
         parser.error("unsupported command")
-    except (FileNotFoundError, FileExistsError, ValueError) as exc:
+    except (OSError, TypeError, ValueError, SSMDUnavailableError) as exc:
+        if getattr(args, "json", False):
+            print(
+                json.dumps(
+                    {
+                        "schema": "ssmdstudio.error.v1",
+                        "ok": False,
+                        "error": {"type": type(exc).__name__, "message": str(exc)},
+                    },
+                    ensure_ascii=False,
+                )
+            )
+            raise SystemExit(2) from exc
         parser.exit(2, f"error: {exc}\n")

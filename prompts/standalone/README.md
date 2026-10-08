@@ -1,39 +1,43 @@
-# Readio standalone LLM guides
+# Standalone SSMD authoring guides
 
-These are standalone authoring guides for generic LLMs. They create SSMD source files; they do not require Readio, Python, the Readio Agent Skill, SSMD tooling, or a local TTS engine on the authoring system.
+These self-contained guides teach a generic LLM to author portable SSMD source. They do not require Readio, Python, an Agent Skill, SSMD tooling, a provider, or a local audio engine on the authoring system. SSMDStudio owns authoring and structural validation; downstream consumers own planning, voice resolution, synthesis, rendering, and export.
 
-## Authoring versus rendering
+## Authoring versus downstream use
 
-These guides are not Readio runtime templates:
+Standalone guides are not runtime templates:
 
-- `readio template` manages ready-to-edit `.ssmd` runtime templates from `readio/resources/templates/`.
-- `llm-guides/ssmd/` contains Markdown instructions that teach an arbitrary LLM how to author portable `.ssmd.md` source.
-- The guide authoring step creates source only; it does not create audio.
-- Validation, voice binding, and rendering happen later on a system where Readio is installed.
+- `ssmdstudio template` manages real, editable starter `.ssmd` documents packaged by SSMDStudio.
+- `prompts/standalone/ssmd/` contains complete Markdown instructions for authoring `.ssmd.md` source.
+- The guide produces source only; it does not create audio or bind voices by default.
+- Structural and optional roundtrip validation can be run with `ssmdstudio ssmd lint FILE.ssmd.md --roundtrip` when the CLI and SSMD runtime are available.
+- `ssmdstudio ssmd bind` is an explicit optional post-authoring step that writes provider-scoped bindings only from caller-supplied voice IDs.
+- A downstream consumer such as Readio performs engine/role resolution, planning, synthesis, rendering, and export.
 
 The intended lifecycle is:
 
 ```text
 source or task
     ↓
-generic web LLM + one standalone guide
+generic LLM + one standalone guide
     ↓
 downloadable .ssmd.md file
     ↓
-move the file to a system with Readio
+optional SSMDStudio lint / explicit voice binding
     ↓
-validate / bind voices / render
+downstream consumer such as Readio
+    ↓
+planning, synthesis, composition, or export
 ```
 
-## How to use in a web harness
+## How to use
 
 Choose exactly one guide and attach it together with the task and any source material.
 
 Example request:
 
-> Follow the attached Readio standalone SSMD guide. Turn the supplied report into a 7-minute German interview podcast. Create a downloadable `.ssmd.md` file. Do not create audio.
+> Follow the attached standalone SSMD authoring guide. Turn the supplied report into a 7-minute German interview podcast. Create a downloadable `.ssmd.md` file. Do not create audio.
 
-The guides are self-contained. The LLM must not need another guide, a shared prompt fragment, local configuration, model discovery, or runtime documentation.
+The guides repeat their own technical rules. The LLM must not need another guide, a shared prompt fragment, a source checkout, an installed SSMDStudio wheel, local configuration, model discovery, or runtime documentation.
 
 ## Artifact mode
 
@@ -45,36 +49,36 @@ When the web harness can create files or artifacts, ask the LLM to:
 4. Expose the file for download.
 5. Create no helper files and no audio.
 
-Use `.ssmd.md` for newly authored complete documents. Readio and SSMD continue to accept legacy `.ssmd` inputs for compatibility; existing runtime templates managed by `readio template` may keep their `.ssmd` filenames.
+Use `.ssmd.md` for newly authored complete documents. SSMD tools may accept legacy `.ssmd` inputs for compatibility; the three starter documents managed by `ssmdstudio template` may keep their `.ssmd` filenames.
 
 The generated file must not contain Markdown fences, surrounding explanation, shell commands, or unexpanded placeholders.
 
 ## Chat fallback mode
 
-When file creation is unavailable, the guide instructs the LLM to return the complete raw SSMD source directly in the response, without Markdown fences or surrounding explanation. Save that response as a `.ssmd.md` file before moving it to the rendering system.
+When file creation is unavailable, return the complete raw SSMD source directly in the response, without Markdown fences or surrounding explanation. Save that response as a `.ssmd.md` file before handing it to a downstream consumer.
 
-## Compatibility target
+## Downstream compatibility context
 
-The guides target the conservative authoring subset used by:
+SSMDStudio authors SSMD 0.9 and does not depend on UtterPlan. For downstream Readio use, the current declared compatibility bounds are:
 
-- Readio with SSMD 0.9 and Utterplan 0.3 support
-- SSMD >=0.9.0,<0.10
-- Utterplan >=0.3.0,<0.4
-- Readio's UtterPlan schema-v3 semantic planning and engine-neutral request contract
-  This is a compatibility target, not a claim that the authoring environment ran validation. A generated file should be checked on the destination system before rendering.
+- SSMD >=0.9.3,<0.10
+- UtterPlan >=0.4.0,<0.5
+- UtterPlan semantic schema v4
+
+These facts describe the downstream consumer, not a requirement on the authoring system or the contents of an SSMD file. A generated file should be structurally checked before downstream use; do not claim validation, binding, planning, rendering, or listening unless it actually occurred.
 
 ## Voice portability
 
 A portable standalone-generated SSMD file:
 
-1. does not require the authoring environment to know local Readio configuration;
+1. does not require the authoring environment to know local configuration;
 2. does not invent model-specific voice IDs;
-3. uses no unnecessary model/provider-specific metadata;
-4. keeps speaker roles symbolic only when speaker distinction is necessary;
-5. can be moved to another machine for Readio preflight and rendering; and
+3. uses no unnecessary provider-specific metadata;
+4. keeps speaker roles symbolic when speaker distinction is necessary;
+5. can be moved to another system for validation and downstream role resolution; and
 6. may still require valid role binding at render time for multi-speaker content.
 
-Portable does not mean guaranteed to render on every model with no later configuration. Concrete `voice_bindings` belong in the generated document only when the caller supplies provider/model-valid IDs; otherwise role resolution is deferred to the rendering environment.
+Portable does not mean guaranteed to render on every model with no later configuration. Concrete `voice_bindings` belong in the document only when the caller supplies provider-valid IDs and asks for them; otherwise role resolution is deferred to the downstream consumer.
 
 ## Guide catalog
 
@@ -94,15 +98,8 @@ Portable does not mean guaranteed to render on every model with no later configu
 - [`ssmd/debate-pro-con.md`](ssmd/debate-pro-con.md) — balanced debate or tradeoff discussion
 - [`ssmd/quiz-trivia.md`](ssmd/quiz-trivia.md) — quiz or trivia with thinking pauses
 
-Each guide is intentionally complete and repeats the technical rules needed for its own generation task. Do not split a guide into required shared includes: one downloaded guide plus a task and optional source material must be enough.
+Keep these standalone guides distinct from the five-stage staged workflow pack in `prompts/workflows/funny-story/`. The standalone guide creates an SSMD artifact directly; workflow prompts operate on structured project context and produce artifacts for SSMDStudio's staged authoring workflow.
 
-## Later validation and rendering
+## Guide evaluations
 
-These are optional destination-system steps, after the `.ssmd.md` file has been created and moved to a machine with Readio installed:
-
-```bash
-readio ssmd check output.ssmd.md
-readio render --file output.ssmd.md -o output.mp3
-```
-
-Run these only where the commands and their runtime dependencies are actually available. Do not claim that they ran during web-only authoring.
+[`../evals/`](../evals/) contains representative evaluation prompts and a manual content rubric. Content review is separate from hard syntax/roundtrip tests; CI does not generate model output or require synthesis, listening, or a provider.

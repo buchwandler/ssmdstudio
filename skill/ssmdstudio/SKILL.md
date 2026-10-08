@@ -1,6 +1,6 @@
 ---
 name: ssmdstudio
-description: Build and revise structured SSMD authoring projects with characters, scenes, feedback, drafts, and compiled prompts.
+description: Author and validate standalone SSMD files and structured projects with characters, scenes, feedback, drafts, and compiled prompts.
 compatibility: Requires the ssmdstudio CLI. Model execution is provided by the surrounding harness, not by ssmdstudio itself.
 ---
 
@@ -17,6 +17,34 @@ Use SSMD Studio when the user is creating or revising SSMD content rather than r
 - Do not invent concrete TTS voice IDs. Use stable symbolic roles and do not use prosody as speaker identity.
 - Preserve locked scenes and explicit human constraints.
 - Do not report SSMD as validated unless an installed SSMD runtime actually ran.
+- Standalone SSMD linting and explicit binding are separate authoring operations; Studio does not select provider voices or render audio.
+
+## Standalone SSMD authoring
+
+Use this path when the user wants an SSMD file directly, not a staged character/scene/draft project. No workflow pack or model provider is needed.
+
+```bash
+# Restore bundled starter files into the user library; this overwrites edits to built-in names.
+ssmdstudio template reset --all
+ssmdstudio template use podcast --output episode.ssmd.md
+# Or make a blank SSMD draft or template-based file.
+ssmdstudio draft new --output notes.ssmd.md
+ssmdstudio draft new --output another-episode.ssmd.md --template podcast
+
+# Structural validation requires the optional authoring extra.
+python -m pip install "ssmdstudio[authoring]"
+ssmdstudio ssmd lint episode.ssmd.md --roundtrip --json
+```
+
+Only run `ssmdstudio ssmd bind FILE --provider PROVIDER --voice-bind ROLE=VOICE_ID ...` when the user has selected the provider and its concrete voice IDs. Never invent voice IDs or present Studio's structural lint as renderability validation. Binding materializes explicit IDs in SSMD; it does not verify their availability.
+
+If a downstream Readio render preflight is requested and the current Readio CLI is available, run its no-audio dry run on a bound or otherwise renderable file:
+
+```bash
+python -m readio render --file episode.bound.ssmd.md --input-format ssmd --dry-run --json
+```
+
+This is a downstream handoff, not a Studio dependency or rendering responsibility. Do not run synthesis or write outputs into the Readio repository.
 
 ## Choose a workflow
 

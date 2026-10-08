@@ -1,0 +1,3 @@
+# Legacy directive syntax must not be accepted as SSMD 0.9
+
+<div voice="narrator">This is deliberately invalid.</div>

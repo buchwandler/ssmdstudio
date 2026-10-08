@@ -1,4 +1,4 @@
-# Readio Standalone SSMD Guide: Funny Story and Comedy SSMD
+# Standalone SSMD authoring guide: Funny Story and Comedy SSMD
 
 ## Mission
 
@@ -20,7 +20,7 @@ If this environment can create downloadable files or artifacts:
 4. Do not wrap the file content in Markdown fences.
 5. Expose or return the `.ssmd.md` file for download.
 
-Use `.ssmd.md` for newly generated complete SSMD documents. Readio and SSMD continue to accept `.ssmd` for compatibility, but do not choose that filename for a new complete document unless the caller explicitly requests it.
+Use `.ssmd.md` for newly generated complete SSMD documents. SSMD tools may accept legacy `.ssmd` inputs for compatibility, but do not choose that filename for a new complete document unless the caller explicitly requests it.
 
 ### Fallback chat mode
 
@@ -36,19 +36,33 @@ If downloadable file or artifact creation is unavailable:
 - Do not put explanatory prose, shell commands, or Markdown fences inside the generated SSMD file.
 - Use the requested language for spoken content. If no language is specified, infer it from the request and source material and stay consistent.
 - Make the text sound natural when spoken aloud; do not write for silent reading.
-- Do not claim that Readio/SSMD validation or audio rendering was executed unless this environment actually provides and runs that tooling.
+- Do not claim that structural validation or audio rendering was executed unless this environment actually provides and runs that tooling.
+
+## Audio quality contract
+
+Write for a listener who cannot see the source, markup, speaker labels, or page layout.
+
+- Keep enough narrated context for the listener to understand the current section and why the next line follows.
+- Give each recurring speaker one stable symbolic `voice` role throughout the document. `voice` identifies the speaker; pitch, rate, volume, emphasis, pauses, and other prosody change delivery only.
+- Make speaker distinction understandable without relying on particular acoustic qualities: add spoken introductions, attribution, or clear transitions when needed.
+- Narrate visual-only information when it is necessary for understanding; clarify references, names, numbers, time, place, and action in spoken context.
+- Prefer natural, varied speech. Give each spoken paragraph or turn one main job; do not make the whole document uniformly staccato or dense.
+- Use SSMD prosody sparingly and only where it materially improves meaning or timing. Most lines should work without markup.
+- For a requested duration, estimate spoken words and pauses before drafting. Treat this as a planning estimate, never an exact render-duration guarantee.
+- Keep semantics portable: do not rely on provider-specific voice IDs, runtime settings, or nonportable markup unless the caller supplies valid bindings and explicitly requests them.
+- Treat examples as demonstrations, not content templates; do not copy their premise, cast, sequence, or wording unless requested.
 
 ## Target runtime
 
-Generate conservative SSMD for this compatibility target:
-Each generated document must include `ssmd_version: '0.9'` in its YAML front matter.
+Generate conservative SSMD 0.9 for downstream consumers. Every document must include `ssmd_version: '0.9'` in its YAML front matter.
 
-- Readio with SSMD 0.9 and Utterplan 0.3 support
-- SSMD >=0.9.0,<0.10
-- Utterplan >=0.3.0,<0.4
-- PyKokoro with Utterplan schema-v3 support
+Readio's current downstream compatibility bounds are:
 
-These are authoring instructions, not a requirement to install or execute the runtime. They must work without Python, a Readio installation, the Readio Agent Skill, local SSMD tooling, or local model discovery. The generated file can be checked and rendered later on a Readio-capable system.
+- SSMD >=0.9.3,<0.10
+- UtterPlan >=0.4.0,<0.5
+- UtterPlan semantic schema v4
+
+These are compatibility facts for downstream Readio use, not authoring requirements. SSMDStudio does not depend on UtterPlan and does not execute semantic planning, role resolution, synthesis, or rendering. Do not add UtterPlan plan data or runtime-specific IDs to SSMD unless the caller explicitly supplies valid binding data. Authoring works without Python, SSMDStudio, SSMD tooling, a Readio installation, an Agent Skill, local model discovery, or a provider. A later consumer may validate, bind, plan, and render the file.
 
 ### Canonical directive fences — exact syntax
 
@@ -91,7 +105,7 @@ pause_defaults:
 ---
 ```
 
-`title` is metadata and is not spoken. Add other fields only when the user's task requires them. Do not emit model IDs, model sources, quality settings, lexicon choices, Readio filesystem paths, local configuration values, or bindings inferred from examples.
+`title` is metadata and is not spoken. Add other fields only when the user's task requires them. Do not emit model IDs, model sources, quality settings, lexicon choices, runtime filesystem paths, local configuration values, or bindings inferred from examples.
 
 ### Voice policy
 
@@ -99,7 +113,7 @@ Do not invent concrete model or voice IDs. Voice inventories are model-specific 
 
 For a single-speaker document, prefer the renderer's default voice and omit explicit `voice` references unless the task requires a named role or distinct voice.
 
-For genuinely multi-speaker documents, use only the minimum conventional symbolic roles needed by the use case: `narrator`, `host`, `guest`, or `analyst`. These symbolic roles may require later binding on the Readio system. Do not invent extra roles such as character, teacher, expert, moderator, villain, or child unless the caller supplies an explicit binding plan.
+For genuinely multi-speaker documents, use only the minimum conventional symbolic roles needed by the use case: `narrator`, `host`, `guest`, or `analyst`. These symbolic roles may require later binding by the downstream rendering consumer. Do not invent extra roles such as character, teacher, expert, moderator, villain, or child unless the caller supplies an explicit binding plan.
 
 Emit document-local `voice_bindings` only when the caller explicitly supplies concrete provider/model-valid voice IDs. Copy supplied IDs exactly; otherwise omit `voice_bindings`. Never leave explanatory metavariables or placeholders in generated SSMD.
 
@@ -256,7 +270,7 @@ Before answering, verify silently that:
 8. No `vrp` or symbolic prosody shorthand appears.
 9. Bare `...` is not being used accidentally as a pause.
 10. The script sounds natural when spoken and source-based claims remain faithful to the supplied material.
-11. The document is constructed so it should be suitable for later `readio ssmd check FILE.ssmd.md`, but no validation or rendering is claimed unless it actually ran.
+11. The document is constructed so it should be suitable for later optional `ssmdstudio ssmd lint FILE.ssmd.md --roundtrip`, but no validation or rendering is claimed unless it actually ran.
 
 ## Use-case voice design
 

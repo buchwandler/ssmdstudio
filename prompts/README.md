@@ -29,4 +29,4 @@ The supported stages are exactly `characters`, `scenes`, `draft`, `revise`, and 
 
 Workflow prompts receive structured project context and produce artifacts understood by SSMDStudio's staged workflow. Standalone prompts are complete authoring guides that can be attached directly to a generic LLM without installing SSMDStudio. In particular, `workflows/funny-story/ssmd.md` converts an approved locked draft, while `standalone/ssmd/funny-story.md` creates a new comic story directly. They are not interchangeable.
 
-Readio's runtime `.ssmd` templates are not LLM prompts and are not catalogued here.
+SSMDStudio's starter `.ssmd` documents managed by `ssmdstudio template` are authoring resources, not LLM prompts. Standalone guide evaluation assets live in `evals/`.

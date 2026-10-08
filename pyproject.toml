@@ -5,10 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ssmdstudio"
 dynamic = ["version"]
-description = "Structured, human-reviewable authoring projects for generating SSMD with LLMs"
+description = "Structured SSMD authoring projects and provider-neutral standalone authoring tools"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [
   {name = "Buchwandler"}
 ]
@@ -17,6 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+authoring = ["ssmd>=0.9.3,<0.10"]
 dev = [
   "build>=1.2",
   "pytest>=8",
@@ -33,7 +34,7 @@ include = ["ssmdstudio*"]
 exclude = ["tests*", "skill*"]
 
 [tool.setuptools.package-data]
-ssmdstudio = ["py.typed"]
+ssmdstudio = ["py.typed", "resources/templates/*.ssmd"]
 
 [tool.setuptools_scm]
 fallback_version = "0+unknown"

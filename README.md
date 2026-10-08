@@ -7,14 +7,64 @@ history.
 
 ## Design boundary
 
-SSMDStudio's Python package stores authoring state, validates project data, assembles prompt context, renders project-owned workflow templates, applies returned artifacts, and optionally validates final SSMD. It contains no prompt prose or Agent Skill content. Prompt packs and skills are repository/user data outside the Python wheel; a project's installed workflow pack is copied into `PROJECT/prompts/` and can be edited independently of Python releases.
+SSMDStudio's Python package stores project authoring state, manages user-scoped SSMD starter documents, validates project data, assembles prompt context, renders project-owned workflow templates, applies returned artifacts, and optionally validates final SSMD. It packages only first-party SSMD starter documents; workflow prompt packs and the Agent Skill remain repository/user data outside the wheel. A project's installed workflow pack is copied into `PROJECT/prompts/` and can be edited independently of Python releases. The optional `authoring` extra provides `ssmd` for standalone lint, roundtrip, binding, and template validation; core project operations do not require it.
 
 ## Prompt families
 
 - `prompts/workflows/funny-story/` is a structured workflow pack. Its five stage templates receive project context and produce artifacts consumed by SSMDStudio; the final `ssmd.md` converts an approved locked draft.
+- Three first-party `.ssmd` starter documents are packaged under `ssmdstudio/resources/templates/` and exposed through `ssmdstudio template`; they are editable documents, not LLM prompts.
 - `prompts/standalone/ssmd/` contains 15 self-contained authoring guides for direct use with a generic LLM. They create SSMD documents without the structured project workflow.
 
-The standalone creative `funny-story.md` and the workflow conversion `ssmd.md` are different prompts. Readio runtime `.ssmd` templates are not LLM prompts and are not included in the catalog. See `prompts/README.md` and `prompts/standalone/README.md` for details.
+The standalone creative `funny-story.md` and the workflow conversion `ssmd.md` are different prompts. Readio runtime `.ssmd` templates are separate from Studio-owned starter documents; neither kind of starter document is an LLM prompt or part of the prompt catalog. See `prompts/README.md` and `prompts/standalone/README.md` for details.
+
+## Standalone SSMD authoring
+
+This file-oriented workflow needs no Studio project, model provider, or audio renderer. Built-in starters are installed in the user template library before use; `reset --all` restores the packaged starter names and overwrites local edits to those names, while custom templates are preserved.
+
+```bash
+ssmdstudio template reset --all
+ssmdstudio template list
+ssmdstudio template use podcast --output episode.ssmd.md
+# Or create a blank file, or start from a library template:
+ssmdstudio draft new --output notes.ssmd.md
+ssmdstudio draft new --output another-episode.ssmd.md --template podcast
+
+# Optional structural validation, roundtrip, and explicit provider binding:
+python -m pip install "ssmdstudio[authoring]"
+ssmdstudio ssmd lint episode.ssmd.md --roundtrip --json
+ssmdstudio ssmd bind episode.ssmd.md --provider kokoro \
+  --voice-bind host="$HOST_VOICE_ID" \
+  --voice-bind guest="$GUEST_VOICE_ID" \
+  --output episode.bound.ssmd.md
+```
+
+Replace the voice placeholders with IDs selected for the named provider; Studio does not discover or verify provider voices. Core project operations do not require the optional `ssmd` runtime. Studio lint checks SSMD structure and optional roundtrip only; it does not resolve render plans, synthesize, or export audio. When a downstream Readio render preflight is wanted, use its no-audio dry run:
+
+```bash
+python -m readio render --file episode.bound.ssmd.md --input-format ssmd \
+  --engine kokoro --dry-run --json
+```
+
+`ssmdstudio draft new` creates a standalone file. It is distinct from `ssmdstudio draft set FILE`, which imports a prose draft into an existing authoring project.
+
+## Readio authoring command migration
+
+Use these Studio commands for standalone authoring. They do not replace Readio's runtime planning or rendering responsibilities.
+
+| Readio command                                                | SSMDStudio replacement / boundary                                                                                                                                                   |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `readio template path [NAME]`                                 | `ssmdstudio template path [NAME]`                                                                                                                                                   |
+| `readio template list`                                        | `ssmdstudio template list` (the user library; run `template reset --all` to install packaged starters)                                                                              |
+| `readio template show NAME`                                   | `ssmdstudio template show NAME`                                                                                                                                                     |
+| `readio template add NAME --file FILE`                        | `ssmdstudio template add NAME --file FILE`                                                                                                                                          |
+| `readio template remove NAME`                                 | `ssmdstudio template remove NAME`                                                                                                                                                   |
+| `readio template reset NAME` / `--all`                        | `ssmdstudio template reset NAME` / `--all` (only bundled names reset; custom templates remain)                                                                                      |
+| `readio template validate NAME` / `--all`                     | `ssmdstudio template validate NAME` / `--all`; `--roundtrip` is optional SSMD validation, not a Readio renderability check                                                          |
+| `readio template use TEMPLATE [--name FILE]`                  | `ssmdstudio template use TEMPLATE --output FILE`, or `ssmdstudio draft new --output FILE --template TEMPLATE`; writes an SSMD starter file, not a Readio ingest/conversion artifact |
+| `readio ingest new [--name NAME] [--template TEMPLATE]`       | `ssmdstudio draft new --output FILE [--template TEMPLATE]`; creates a standalone file at the requested path                                                                         |
+| `readio ingest list` / `path`                                 | No managed ingest directory in Studio; use filesystem paths. `ssmdstudio draft set FILE` imports a prose draft into a selected project.                                             |
+| `readio ssmd bind FILE --provider P --voice-bind ROLE=ID ...` | `ssmdstudio ssmd bind FILE --provider P --voice-bind ROLE=ID ...`; materializes explicit bindings without checking voice availability                                               |
+| `readio ssmd check FILE --roundtrip --json`                   | `ssmdstudio ssmd lint FILE --roundtrip --json` for structural lint. For Readio-specific plan/voice preflight, separately run `readio render --file FILE --dry-run --json`.          |
 
 ## Standalone projects and workspaces
 
@@ -176,6 +226,23 @@ For Python callers, `studio.install_prompt_pack(PATH)` installs external pack da
 For a standalone project, use `Studio.open("picnic")`. The Python API and CLI share the same
 filesystem-backed state.
 
+The standalone APIs are also exported from the package root. `check_ssmd` reports `unavailable` when the optional runtime is absent; binding requires the `authoring` extra and explicit provider IDs.
+
+```python
+from pathlib import Path
+from ssmdstudio import TemplateLibrary, check_ssmd, materialize_voice_bindings
+
+templates = TemplateLibrary()  # run `ssmdstudio template reset --all` to install bundled starters
+print(templates.path("podcast"))
+result = check_ssmd(Path("episode.ssmd.md"), roundtrip=True)
+bound = materialize_voice_bindings(
+    Path("episode.ssmd.md"),
+    {"host": "HOST_VOICE_ID"},  # replace with an ID selected for this provider
+    provider="kokoro",
+)
+print(result.state, bound.output)
+```
+
 ## Development
 
 There is intentionally no `src/` directory. Versioning is dynamic through `setuptools-scm`.
@@ -189,6 +256,7 @@ python -m build --wheel
 
 ## Non-goals
 
-SSMD Studio does not include model-provider clients, a database, a GUI, audio rendering, concrete
-provider voice IDs, semantic merge machinery, or background jobs. The SSMD runtime owns final
-validation, binding, and rendering.
+SSMDStudio does not include model-provider clients, a database, a GUI, audio rendering, concrete
+provider voice IDs, semantic merge machinery, or background jobs. Structural checking and explicit
+binding use the optional `ssmd` runtime; downstream consumers own role resolution, render planning,
+synthesis, audio rendering, and export.

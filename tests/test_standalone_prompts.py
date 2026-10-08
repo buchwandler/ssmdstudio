@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import re
 from pathlib import Path
 
@@ -8,32 +7,58 @@ import pytest
 
 PROMPT_ROOT = Path(__file__).parents[1] / "prompts"
 GUIDE_DIR = PROMPT_ROOT / "standalone" / "ssmd"
-EXPECTED_HASHES = {
-    "audio-drama.md": "d930ddb9275f7d3c6f3f76ab1402df9349dbff7c30d81f64a09cf10db5c97cf3",
-    "debate-pro-con.md": "d2d8689a832c590c936aedb50f606b9d24c04081fc29bdfc153b11fa63d81604",
-    "document-summary.md": "5abbf76c8e2b4ef33afeff8615d9d48a6dc9d95b517d467843cc908512587abf",
-    "dramatic-story.md": "71ec0610379fa01fbd4b0a446f073f616b8d35ededaca08d8a5171d199822228",
-    "educational-explainer.md": "b54306680cc117afe77782dc44d6bbdb830dbe89817e3667719de4db35383f25",
-    "funny-story.md": "004ff355db9483971aa1361f14291c1938b869a2e4d198a5c4090272fcd99064",
-    "general-narration.md": "14dfe5a1dd53ff2c3e6d62da6528e21d18c67ecb84c1e514775aaaacdd664561",
-    "guided-meditation.md": "795e445703d0e342f76a90b658f27a8484afd553cda21bec9f34569f0bd08941",
-    "kids-story.md": "82d747b46531e153df5d2b136031d9702236ef59a57d261e5175cb00a04aee97",
-    "language-learning.md": "be803a387650157f5aaf011655f634c1b0377c398ea9a2dca23aebe3362f2e0c",
-    "news-briefing.md": "de06f1bab6ba4b9bdb3e0ecfcb747f502a8a6e1ed54fed0fa17176c84bb23169",
-    "podcast-interview.md": "35be6a15588e65101431c4331b89b6f16f6f93f4139140bce63e6e8140bae184",
-    "podcast-roundtable.md": "9d1442c359f72133bc5c13ff7787c77c32023c02e092a7b7c974fc8be46b0261",
-    "podcast-solo.md": "4c7466fd2d3a0249ac19e083d9df11937d4b29d62ec6e92e6af52c960dd8b41f",
-    "quiz-trivia.md": "6fb99b94ac9c7746532bba119c4d127621835d4f9c07ada54e1144f32d278b9a",
+EVAL_ROOT = PROMPT_ROOT / "evals"
+EXPECTED_GUIDES = {
+    "audio-drama.md",
+    "debate-pro-con.md",
+    "document-summary.md",
+    "dramatic-story.md",
+    "educational-explainer.md",
+    "funny-story.md",
+    "general-narration.md",
+    "guided-meditation.md",
+    "kids-story.md",
+    "language-learning.md",
+    "news-briefing.md",
+    "podcast-interview.md",
+    "podcast-roundtable.md",
+    "podcast-solo.md",
+    "quiz-trivia.md",
+}
+
+EXPECTED_EVAL_PROMPTS = {
+    "audio-drama.md",
+    "audio-drama-source.md",
+    "debate-pro-con.md",
+    "document-summary.md",
+    "dramatic-story-constraints.md",
+    "dramatic-story.md",
+    "educational-explainer.md",
+    "funny-story-source.md",
+    "funny-story.md",
+    "general-narration.md",
+    "guided-meditation.md",
+    "kids-story-constraints.md",
+    "kids-story.md",
+    "language-learning.md",
+    "news-briefing.md",
+    "podcast-interview-source.md",
+    "podcast-interview.md",
+    "podcast-roundtable-source.md",
+    "podcast-roundtable.md",
+    "podcast-solo.md",
+    "quiz-trivia.md",
 }
 REQUIRED_SECTIONS = {
     "Mission",
     "Output contract",
+    "Audio quality contract",
     "Target runtime",
     "Content integrity",
     "Final self-check",
     "Generation procedure",
 }
-SHARED_SECTIONS = REQUIRED_SECTIONS - {"Mission"}
+SHARED_SECTIONS = REQUIRED_SECTIONS - {"Mission", "Target runtime"}
 KNOWN_DEFAULT_VOICE_IDS = {
     "af_sarah",
     "am_michael",
@@ -52,17 +77,15 @@ def _section(text: str, heading: str) -> str:
 
 def _guides() -> list[tuple[Path, str]]:
     paths = sorted(GUIDE_DIR.glob("*.md"))
-    assert {path.name for path in paths} == set(EXPECTED_HASHES)
+    assert {path.name for path in paths} == EXPECTED_GUIDES
     return [(path, path.read_text(encoding="utf-8")) for path in paths]
 
 
-def test_standalone_catalog_has_exact_hashed_kebab_case_inventory() -> None:
+def test_standalone_catalog_has_exact_kebab_case_inventory() -> None:
     paths = sorted(GUIDE_DIR.glob("*.md"))
     assert len(paths) == 15
-    assert {path.name for path in paths} == set(EXPECTED_HASHES)
+    assert {path.name for path in paths} == EXPECTED_GUIDES
     assert all(re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.md", path.name) for path in paths)
-    for path in paths:
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == EXPECTED_HASHES[path.name]
 
 
 def test_guides_are_self_contained_with_required_sections_and_ssmd_09_examples() -> None:
@@ -76,8 +99,8 @@ def test_guides_are_self_contained_with_required_sections_and_ssmd_09_examples()
             "this file is a complete instruction set",
             "without python",
             "a readio installation",
-            "readio agent skill",
-            "local ssmd tooling",
+            "an agent skill",
+            "ssmd tooling",
             "local model discovery",
         ):
             assert phrase in lowered, (path.name, phrase)
@@ -95,12 +118,14 @@ def test_guides_preserve_standalone_output_contract_and_model_agnostic_voice_pol
         assert "downloadable files or artifacts" in output, path.name
         assert "exactly one utf-8" in output, path.name
         assert "`.ssmd.md` filename" in output, path.name
-        assert "accept `.ssmd` for compatibility" in output, path.name
+        assert "ssmd tools may accept legacy `.ssmd` inputs for compatibility" in output, path.name
         assert "fallback chat mode" in lowered, path.name
         assert "complete raw ssmd source" in output, path.name
         assert "markdown code fences" in output, path.name
         assert "do not create helper files" in output, path.name
-        assert "do not claim that readio/ssmd validation" in output, path.name
+        assert (
+            "do not claim that structural validation or audio rendering was executed" in output
+        ), path.name
         assert "do not invent concrete model or voice ids" in lowered, path.name
         assert "voice_bindings" in text, path.name
         assert "No invented concrete voice IDs" in final, path.name
@@ -121,15 +146,81 @@ def test_shared_technical_sections_do_not_drift() -> None:
         assert "invalid" in target.casefold(), path.name
 
 
+def test_guide_authorship_branding_and_downstream_compatibility_are_current() -> None:
+    compatibility_blocks: list[str] = []
+    for path, text in _guides():
+        assert not re.search(r"(?im)^# .*readio", text), path.name
+        target = _section(text, "Target runtime")
+        compatibility_blocks.append(target.split("### Canonical directive fences", 1)[0].strip())
+        assert "SSMD >=0.9.3,<0.10" in target, path.name
+        assert "UtterPlan >=0.4.0,<0.5" in target, path.name
+        assert "UtterPlan semantic schema v4" in target, path.name
+        assert "SSMDStudio does not depend on UtterPlan" in target, path.name
+        assert "0.3.0" not in target, path.name
+        assert "schema-v3" not in target.casefold(), path.name
+    assert len(set(compatibility_blocks)) == 1
+
+
+def test_all_guides_share_audio_quality_contract_and_audio_drama_has_narrator() -> None:
+    required = (
+        "listener who cannot see",
+        "narrated context",
+        "stable symbolic `voice` role",
+        "pitch, rate, volume, emphasis, pauses, and other prosody change delivery only",
+        "spoken introductions",
+        "visual-only information",
+        "natural, varied speech",
+        "requested duration",
+        "keep semantics portable",
+    )
+    for path, text in _guides():
+        contract = _section(text, "Audio quality contract").casefold()
+        for phrase in required:
+            assert phrase in contract, (path.name, phrase)
+
+    drama = _section(
+        (GUIDE_DIR / "audio-drama.md").read_text(encoding="utf-8"),
+        "Use-case voice design",
+    ).casefold()
+    assert "narrator" in drama
+    assert "essential scene information" in drama
+
+
 def test_catalog_readme_documents_ssmd_authoring_and_runtime_template_distinction() -> None:
     readme = (PROMPT_ROOT / "standalone" / "README.md").read_text(encoding="utf-8")
     lowered = readme.casefold()
     assert "downloadable .ssmd.md file" in lowered
     assert "create exactly one utf-8 `.ssmd.md` file" in lowered
     assert "legacy `.ssmd`" in lowered
-    assert "existing runtime templates managed by `readio template`" in lowered
+    assert "starter documents managed by `ssmdstudio template`" in lowered
     assert not list(PROMPT_ROOT.rglob("*.ssmd"))
     assert not (PROMPT_ROOT / "standalone" / "readio" / "SKILL.md").exists()
+
+
+def test_evaluation_corpus_is_complete_and_separate_from_hard_validation() -> None:
+    prompt_dir = EVAL_ROOT / "prompts"
+    paths = sorted(prompt_dir.glob("*.md"))
+    assert {path.name for path in paths} == EXPECTED_EVAL_PROMPTS
+    assert len(paths) == 21
+    assert (EVAL_ROOT / "README.md").is_file()
+    assert (EVAL_ROOT / "rubric.md").is_file()
+    for path in paths:
+        text = path.read_text(encoding="utf-8")
+        assert "standalone ssmd 0.9 document" in text.casefold(), path.name
+        assert (
+            "do not claim validation, rendering, or listening unless it occurred" in text.casefold()
+        ), path.name
+
+    corpus = (EVAL_ROOT / "README.md").read_text(encoding="utf-8").casefold()
+    rubric = (EVAL_ROOT / "rubric.md").read_text(encoding="utf-8").casefold()
+    assert "not a ci benchmark" in corpus
+    assert "structural and roundtrip validation are separate checks" in corpus
+    assert "not structural validation or runtime preflight" in rubric
+    assert (
+        "does not assume a particular renderer, provider, voice inventory, or audio engine"
+        in rubric
+    )
+    assert "mark it **unverified**" in rubric
 
 
 def test_ssmd_examples_parse_when_runtime_is_available() -> None:

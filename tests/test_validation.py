@@ -8,6 +8,7 @@ import pytest
 
 from ssmdstudio import Studio
 from ssmdstudio.cli import main
+from ssmdstudio.ssmd import materialize_voice_bindings
 
 
 def make_studio(tmp_path: Path) -> Studio:
@@ -18,35 +19,88 @@ def make_studio(tmp_path: Path) -> Studio:
     return studio
 
 
+def _payload(*, ok: bool = True, issues: list[dict[str, object]] | None = None) -> str:
+    return json.dumps(
+        {
+            "schema": "ssmd.cli.v1",
+            "ok": ok,
+            "result": {
+                "files": [{"ok": ok, "issues": issues or []}],
+                "summary": {"error_count": 0, "warning_count": len(issues or [])},
+            },
+        }
+    )
+
+
+def _fake_ssmd(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("ssmdstudio.ssmd.shutil.which", lambda _name: "/fake/bin/ssmd")
+
+
 def test_output_validation_records_passed_and_stales_after_output_change(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     studio = make_studio(tmp_path)
-    monkeypatch.setattr("ssmdstudio.project.shutil.which", lambda _: "/fake/bin/ssmd")
+    _fake_ssmd(monkeypatch)
 
-    def run(command, *, cwd, capture_output, text, check):
+    def run(command, **kwargs):
         assert command[1:] == [
             "--json",
             "lint",
-            "output/current.ssmd.md",
+            str((studio.root / "output/current.ssmd.md").resolve()),
+            "--dialect",
+            "0.9",
             "--roundtrip",
             "--fail-on-warn",
         ]
-        assert cwd == studio.root
-        assert capture_output and text and not check
-        return subprocess.CompletedProcess(command, 0, '{"errors": []}\n', "")
+        assert kwargs == {
+            "shell": False,
+            "capture_output": True,
+            "text": True,
+            "timeout": 30,
+            "check": False,
+        }
+        return subprocess.CompletedProcess(command, 0, _payload(), "")
 
-    monkeypatch.setattr("ssmdstudio.project.subprocess.run", run)
+    monkeypatch.setattr("ssmdstudio.ssmd.subprocess.run", run)
     result = studio.validate_output()
     assert result["state"] == "passed"
     assert studio.validation_status() == "passed"
     record = json.loads((studio.root / "output" / "validation.json").read_text(encoding="utf-8"))
+    assert record["schema"] == "ssmdstudio.validation.v1"
     assert record["state"] == "passed"
     assert record["returncode"] == 0
+    assert record["source_sha256"] == record["output_sha256"]
 
     replacement = tmp_path / "story.ssmd.md"
     replacement.write_text("---\nssmd_version: '0.9'\n---\nChanged.\n", encoding="utf-8")
     studio.set_output(replacement)
+    assert studio.validation_status() == "stale"
+    studio.validate_output()
+    assert studio.validation_status() == "passed"
+
+
+def test_in_place_binding_invalidates_previous_validation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pytest.importorskip("ssmd")
+    studio = make_studio(tmp_path)
+    source = tmp_path / "authored.ssmd"
+    source.write_text(':::{voice="narrator"}\nNarration.\n:::\n', encoding="utf-8")
+    studio.set_output(source)
+    _fake_ssmd(monkeypatch)
+    monkeypatch.setattr(
+        "ssmdstudio.ssmd.subprocess.run",
+        lambda command, **kwargs: subprocess.CompletedProcess(command, 0, _payload(), ""),
+    )
+    studio.validate_output()
+    assert studio.validation_status() == "passed"
+
+    materialize_voice_bindings(
+        studio.root / "output/current.ssmd.md",
+        {"narrator": "explicit-voice"},
+        provider="kokoro",
+        in_place=True,
+    )
     assert studio.validation_status() == "stale"
 
 
@@ -54,10 +108,20 @@ def test_failed_output_validation_surfaces_diagnostics_and_exit_status(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     studio = make_studio(tmp_path)
-    monkeypatch.setattr("ssmdstudio.project.shutil.which", lambda _: "/fake/bin/ssmd")
-    diagnostic = '{"errors": [{"code": "roundtrip.semantic_loss"}]}\n'
+    _fake_ssmd(monkeypatch)
+    diagnostic = _payload(
+        ok=False,
+        issues=[
+            {
+                "severity": "error",
+                "code": "roundtrip.semantic_loss",
+                "message": "roundtrip changed source",
+                "line": 3,
+            }
+        ],
+    )
     monkeypatch.setattr(
-        "ssmdstudio.project.subprocess.run",
+        "ssmdstudio.ssmd.subprocess.run",
         lambda command, **kwargs: subprocess.CompletedProcess(
             command, 1, diagnostic, "lint failed\n"
         ),
@@ -78,15 +142,16 @@ def test_unavailable_output_validation_is_explicit_not_validated(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     studio = make_studio(tmp_path)
-    monkeypatch.setattr("ssmdstudio.project.shutil.which", lambda _: None)
+    monkeypatch.setattr("ssmdstudio.ssmd.shutil.which", lambda _: None)
 
     result = studio.validate_output()
     assert result["state"] == "unavailable"
     assert result["command"] is None
+    assert result["diagnostics"] == []
     assert studio.validation_status() == "unavailable"
 
     main(["output", "validate", "--project", str(studio.root)])
     output = capsys.readouterr().out
     assert "validation: unavailable" in output
-    assert "ssmd runtime is not installed" in output
+    assert "ssmd executable is not installed or not on PATH" in output
     assert "passed" not in output

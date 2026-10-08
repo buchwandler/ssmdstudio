@@ -4,7 +4,6 @@ import hashlib
 import json
 import os
 import shutil
-import subprocess
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +19,7 @@ from .models import (
     validate_ssmd_role,
 )
 from .prompts import STAGE_SPECS, STAGES, PromptPack, render_template
+from .ssmd import check_ssmd
 from .store import (
     atomic_write_text,
     dump_yaml,
@@ -450,47 +450,13 @@ class Studio:
         output = self.root / "output" / "current.ssmd.md"
         if not output.is_file():
             raise FileNotFoundError("no SSMD output to validate")
-        output_hash = hashlib.sha256(output.read_bytes()).hexdigest()
-        validator = shutil.which("ssmd")
-        checked_at = datetime.now(timezone.utc).isoformat()
-        if validator is None:
-            result: dict[str, Any] = {
-                "state": "unavailable",
-                "path": "output/current.ssmd.md",
-                "message": "ssmd runtime is not installed",
-                "command": None,
-                "returncode": None,
-                "stdout": "",
-                "stderr": "",
-            }
-        else:
-            command = [
-                validator,
-                "--json",
-                "lint",
-                "output/current.ssmd.md",
-                "--roundtrip",
-                "--fail-on-warn",
-            ]
-            completed = subprocess.run(
-                command,
-                cwd=self.root,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            result = {
-                "state": "passed" if completed.returncode == 0 else "failed",
-                "path": "output/current.ssmd.md",
-                "command": command,
-                "returncode": completed.returncode,
-                "stdout": completed.stdout,
-                "stderr": completed.stderr,
-            }
-        result["checked_at"] = checked_at
-        result["output_sha256"] = output_hash
-        write_json(self.root / "output" / "validation.json", result)
-        return result
+        result = check_ssmd(output, roundtrip=True, fail_on_warn=True)
+        record = result.to_dict()
+        record["path"] = "output/current.ssmd.md"
+        record["checked_at"] = datetime.now(timezone.utc).isoformat()
+        record["output_sha256"] = result.source_sha256
+        write_json(self.root / "output" / "validation.json", record)
+        return record
 
     def validation_status(self) -> str:
         record_path = self.root / "output" / "validation.json"

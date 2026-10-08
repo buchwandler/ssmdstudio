@@ -4,13 +4,12 @@ import hashlib
 import json
 import os
 import re
+from collections.abc import Iterable
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
-from collections.abc import Iterable
 
 import yaml
-
 
 _ID_RE = re.compile(r"[^a-z0-9]+")
 
@@ -41,7 +40,7 @@ def atomic_write_text(path: Path, text: str) -> None:
 def load_yaml(path: Path) -> dict[str, Any]:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
-        raise ValueError(f"expected a YAML mapping in {path}")
+        raise TypeError(f"expected a YAML mapping in {path}")
     return data
 
 
