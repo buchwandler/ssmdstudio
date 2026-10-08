@@ -1,0 +1,55 @@
+schema: releaseledger.entry-batch.v1
+operation: create
+schema_version: 1
+object_type: release_entry_batch
+release_version: v0.1.0
+entries:
+  - kind: added
+    summary: Added a filesystem-backed Python API and CLI for structured SSMD project authoring
+    status: accepted
+    source_refs:
+      - git:aa223cf8562e4c84204c9e2cdf04b6c3bd453cfe
+    paths:
+      - ssmdstudio/cli.py
+      - ssmdstudio/project.py
+      - ssmdstudio/models.py
+      - ssmdstudio/store.py
+  - kind: added
+    summary: Added guided workflows, workspace management, prompt-pack provenance, artifact application, and validation reporting
+    status: accepted
+    source_refs:
+      - git:3c655ce5bcbb0b8e3aa7c1c2e3ab202c2c2329ea
+    paths:
+      - ssmdstudio/cli.py
+      - ssmdstudio/project.py
+      - ssmdstudio/workspace.py
+      - ssmdstudio/prompts.py
+  - kind: added
+    summary: Added editable repository prompt packs and standalone SSMD guides for direct LLM authoring
+    status: accepted
+    source_refs:
+      - git:a046f191e116ab8ac65a89d3f51ea1ad5263738a
+    paths:
+      - prompts/README.md
+      - prompts/standalone/ssmd
+      - prompts/workflows/funny-story
+      - ssmdstudio/prompts.py
+  - kind: added
+    summary: Added packaged SSMD starter templates and commands for creating and managing standalone drafts
+    status: accepted
+    source_refs:
+      - git:4a09392c214a5d89e4ef399127c710e22caf7c9c
+    paths:
+      - ssmdstudio/templates.py
+      - ssmdstudio/resources/templates
+      - ssmdstudio/cli.py
+      - tests/test_templates.py
+  - kind: added
+    summary: Added optional SSMD structural linting and explicit provider voice binding for standalone documents
+    status: accepted
+    source_refs:
+      - git:ef872f8eaa3ca47e8340a4177aa2e8ba75d7700e
+    paths:
+      - ssmdstudio/ssmd.py
+      - ssmdstudio/cli.py
+      - pyproject.toml

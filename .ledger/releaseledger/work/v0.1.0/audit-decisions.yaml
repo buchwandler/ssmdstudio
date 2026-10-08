@@ -1,0 +1,74 @@
+rows:
+  - sha: aa223cf8562e4c84204c9e2cdf04b6c3bd453cfe
+    inspected: true
+    inspected_paths:
+      - ssmdstudio/cli.py
+      - ssmdstudio/project.py
+      - ssmdstudio/models.py
+      - ssmdstudio/store.py
+      - tests/test_cli.py
+      - tests/test_studio.py
+    observed_behavior: Provides a filesystem-backed Python API and CLI for creating structured SSMD projects, storing authoring artifacts, and advancing a prompt-driven workflow.
+    public_impact: public
+    decision: accepted
+    target_entry_key: project-authoring
+    notes: Initial public project authoring surface reviewed from implementation and tests.
+  - sha: 3c655ce5bcbb0b8e3aa7c1c2e3ab202c2c2329ea
+    inspected: true
+    inspected_paths:
+      - ssmdstudio/cli.py
+      - ssmdstudio/project.py
+      - ssmdstudio/workspace.py
+      - ssmdstudio/prompts.py
+      - tests/test_cli.py
+      - tests/test_studio.py
+      - tests/test_validation.py
+      - tests/test_workspace.py
+    observed_behavior: Adds guided next-step workflow, workspace project management, prompt-pack installation and provenance tracking, artifact application, and validation status handling.
+    public_impact: public
+    decision: accepted
+    target_entry_key: guided-workflow
+    notes: User-facing workflow and workspace behavior reviewed against implementation and tests.
+  - sha: a046f191e116ab8ac65a89d3f51ea1ad5263738a
+    inspected: true
+    inspected_paths:
+      - prompts/README.md
+      - prompts/standalone/README.md
+      - prompts/standalone/ssmd
+      - prompts/workflows/funny-story
+      - ssmdstudio/prompts.py
+      - ssmdstudio/project.py
+      - tests/test_prompt_packs.py
+      - tests/test_standalone_prompts.py
+    observed_behavior: Moves editable workflow prompt assets to repository-level prompts, adds standalone SSMD guides, and supports loading prompt packs from project-owned files.
+    public_impact: public
+    decision: accepted
+    target_entry_key: prompt-assets
+    notes: Prompt-pack ownership and standalone guide behavior reviewed from changed files and tests.
+  - sha: 4a09392c214a5d89e4ef399127c710e22caf7c9c
+    inspected: true
+    inspected_paths:
+      - ssmdstudio/templates.py
+      - ssmdstudio/ssmd.py
+      - ssmdstudio/cli.py
+      - ssmdstudio/resources/templates
+      - prompts/evals
+      - tests/test_templates.py
+      - tests/test_ssmd_authoring.py
+      - tests/test_ssmd_lint.py
+    observed_behavior: Adds packaged SSMD starter templates, template-library and draft commands, optional structural linting and explicit provider binding, plus prompt evaluation fixtures.
+    public_impact: public
+    decision: accepted
+    target_entry_key: standalone-authoring
+    notes: Standalone authoring behavior reviewed from implementation, templates, and tests.
+  - sha: ef872f8eaa3ca47e8340a4177aa2e8ba75d7700e
+    inspected: true
+    inspected_paths:
+      - pyproject.toml
+      - ssmdstudio/cli.py
+      - ssmdstudio/ssmd.py
+    observed_behavior: Refines optional authoring dependency metadata and hardens CLI and SSMD integration behavior for packaging and type checking.
+    public_impact: public
+    decision: accepted
+    target_entry_key: packaging-validation
+    notes: Packaging and integration changes reviewed directly; no separate internal-only note needed.

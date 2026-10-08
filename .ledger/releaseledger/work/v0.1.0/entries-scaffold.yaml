@@ -1,0 +1,231 @@
+schema: releaseledger.entry-batch.v1
+operation: create
+schema_version: 1
+object_type: release_entry_batch
+release_version: v0.1.0
+git_base_ref: 10b5ed3
+git_base_sha: 10b5ed364a18e738576d213b759b2d7864950268
+git_head_ref: HEAD
+git_head_sha: ef872f8eaa3ca47e8340a4177aa2e8ba75d7700e
+include_merges: nontrivial
+entries:
+  - kind: added
+    summary: ""
+    status: draft
+    source_refs:
+      - git:aa223cf8562e4c84204c9e2cdf04b6c3bd453cfe
+    paths:
+      - .codecrate.toml
+      - .github/workflows/python-publish.yml
+      - .github/workflows/tests.yml
+      - .gitignore
+      - .ledger/ledger.toml
+      - .ledger/taskledger/.ledger-project.toml
+      - .ledger/taskledger/config.toml
+      - .pre-commit-config.yaml
+      - README.md
+      - examples/character-anna.yaml
+      - pyproject.toml
+      - skill/ssmdstudio/SKILL.md
+      - ssmdstudio/__init__.py
+      - ssmdstudio/__main__.py
+      - ssmdstudio/cli.py
+      - ssmdstudio/models.py
+      - ssmdstudio/project.py
+      - ssmdstudio/prompts.py
+      - ssmdstudio/py.typed
+      - ssmdstudio/resources/__init__.py
+      - ssmdstudio/resources/prompts/__init__.py
+      - ssmdstudio/resources/prompts/funny-story/__init__.py
+      - ssmdstudio/resources/prompts/funny-story/characters.md
+      - ssmdstudio/resources/prompts/funny-story/draft.md
+      - ssmdstudio/resources/prompts/funny-story/revise.md
+      - ssmdstudio/resources/prompts/funny-story/scenes.md
+      - ssmdstudio/resources/prompts/funny-story/ssmd.md
+      - ssmdstudio/store.py
+      - tests/test_cli.py
+      - tests/test_studio.py
+    sources:
+      - git:aa223cf8562e4c84204c9e2cdf04b6c3bd453cfe
+    prs: []
+    issues: []
+    contributors:
+      - "@holgern"
+  - kind: added
+    summary: ""
+    status: draft
+    source_refs:
+      - git:3c655ce5bcbb0b8e3aa7c1c2e3ab202c2c2329ea
+    paths:
+      - README.md
+      - pyproject.toml
+      - skill/ssmdstudio/SKILL.md
+      - ssmdstudio/__init__.py
+      - ssmdstudio/cli.py
+      - ssmdstudio/models.py
+      - ssmdstudio/project.py
+      - ssmdstudio/prompts.py
+      - ssmdstudio/resources/prompts/funny-story/characters.md
+      - ssmdstudio/resources/prompts/funny-story/draft.md
+      - ssmdstudio/resources/prompts/funny-story/revise.md
+      - ssmdstudio/resources/prompts/funny-story/scenes.md
+      - ssmdstudio/resources/prompts/funny-story/ssmd.md
+      - ssmdstudio/resources/skills/ssmdstudio/SKILL.md
+      - ssmdstudio/workspace.py
+      - tests/test_cli.py
+      - tests/test_packaging.py
+      - tests/test_studio.py
+      - tests/test_validation.py
+      - tests/test_workspace.py
+    sources:
+      - git:3c655ce5bcbb0b8e3aa7c1c2e3ab202c2c2329ea
+    prs: []
+    issues: []
+    contributors:
+      - "@holgern"
+  - kind: added
+    summary: ""
+    status: draft
+    source_refs:
+      - git:a046f191e116ab8ac65a89d3f51ea1ad5263738a
+    paths:
+      - README.md
+      - prompts/README.md
+      - prompts/standalone/README.md
+      - prompts/standalone/ssmd/audio-drama.md
+      - prompts/standalone/ssmd/debate-pro-con.md
+      - prompts/standalone/ssmd/document-summary.md
+      - prompts/standalone/ssmd/dramatic-story.md
+      - prompts/standalone/ssmd/educational-explainer.md
+      - prompts/standalone/ssmd/funny-story.md
+      - prompts/standalone/ssmd/general-narration.md
+      - prompts/standalone/ssmd/guided-meditation.md
+      - prompts/standalone/ssmd/kids-story.md
+      - prompts/standalone/ssmd/language-learning.md
+      - prompts/standalone/ssmd/news-briefing.md
+      - prompts/standalone/ssmd/podcast-interview.md
+      - prompts/standalone/ssmd/podcast-roundtable.md
+      - prompts/standalone/ssmd/podcast-solo.md
+      - prompts/standalone/ssmd/quiz-trivia.md
+      - prompts/workflows/funny-story/characters.md
+      - prompts/workflows/funny-story/draft.md
+      - prompts/workflows/funny-story/prompt-pack.yaml
+      - prompts/workflows/funny-story/revise.md
+      - prompts/workflows/funny-story/scenes.md
+      - prompts/workflows/funny-story/ssmd.md
+      - pyproject.toml
+      - skill/ssmdstudio/SKILL.md
+      - ssmdstudio/cli.py
+      - ssmdstudio/project.py
+      - ssmdstudio/prompts.py
+      - ssmdstudio/resources/__init__.py
+      - ssmdstudio/resources/prompts/__init__.py
+      - ssmdstudio/resources/prompts/funny-story/__init__.py
+      - ssmdstudio/resources/skills/ssmdstudio/SKILL.md
+      - ssmdstudio/workspace.py
+      - tests/test_cli.py
+      - tests/test_packaging.py
+      - tests/test_prompt_packs.py
+      - tests/test_standalone_prompts.py
+      - tests/test_studio.py
+    sources:
+      - git:a046f191e116ab8ac65a89d3f51ea1ad5263738a
+    prs: []
+    issues: []
+    contributors:
+      - "@holgern"
+  - kind: added
+    summary: ""
+    status: draft
+    source_refs:
+      - git:4a09392c214a5d89e4ef399127c710e22caf7c9c
+    paths:
+      - README.md
+      - prompts/README.md
+      - prompts/evals/README.md
+      - prompts/evals/prompts/audio-drama-source.md
+      - prompts/evals/prompts/audio-drama.md
+      - prompts/evals/prompts/debate-pro-con.md
+      - prompts/evals/prompts/document-summary.md
+      - prompts/evals/prompts/dramatic-story-constraints.md
+      - prompts/evals/prompts/dramatic-story.md
+      - prompts/evals/prompts/educational-explainer.md
+      - prompts/evals/prompts/funny-story-source.md
+      - prompts/evals/prompts/funny-story.md
+      - prompts/evals/prompts/general-narration.md
+      - prompts/evals/prompts/guided-meditation.md
+      - prompts/evals/prompts/kids-story-constraints.md
+      - prompts/evals/prompts/kids-story.md
+      - prompts/evals/prompts/language-learning.md
+      - prompts/evals/prompts/news-briefing.md
+      - prompts/evals/prompts/podcast-interview-source.md
+      - prompts/evals/prompts/podcast-interview.md
+      - prompts/evals/prompts/podcast-roundtable-source.md
+      - prompts/evals/prompts/podcast-roundtable.md
+      - prompts/evals/prompts/podcast-solo.md
+      - prompts/evals/prompts/quiz-trivia.md
+      - prompts/evals/rubric.md
+      - prompts/standalone/README.md
+      - prompts/standalone/ssmd/audio-drama.md
+      - prompts/standalone/ssmd/debate-pro-con.md
+      - prompts/standalone/ssmd/document-summary.md
+      - prompts/standalone/ssmd/dramatic-story.md
+      - prompts/standalone/ssmd/educational-explainer.md
+      - prompts/standalone/ssmd/funny-story.md
+      - prompts/standalone/ssmd/general-narration.md
+      - prompts/standalone/ssmd/guided-meditation.md
+      - prompts/standalone/ssmd/kids-story.md
+      - prompts/standalone/ssmd/language-learning.md
+      - prompts/standalone/ssmd/news-briefing.md
+      - prompts/standalone/ssmd/podcast-interview.md
+      - prompts/standalone/ssmd/podcast-roundtable.md
+      - prompts/standalone/ssmd/podcast-solo.md
+      - prompts/standalone/ssmd/quiz-trivia.md
+      - pyproject.toml
+      - skill/ssmdstudio/SKILL.md
+      - ssmdstudio/__init__.py
+      - ssmdstudio/cli.py
+      - ssmdstudio/project.py
+      - ssmdstudio/resources/__init__.py
+      - ssmdstudio/resources/templates/README.md
+      - ssmdstudio/resources/templates/__init__.py
+      - ssmdstudio/resources/templates/briefing.ssmd
+      - ssmdstudio/resources/templates/dialogue.ssmd
+      - ssmdstudio/resources/templates/podcast.ssmd
+      - ssmdstudio/ssmd.py
+      - ssmdstudio/store.py
+      - ssmdstudio/templates.py
+      - tests/fixtures/authoring/README.md
+      - tests/fixtures/authoring/binding-preservation.ssmd.md
+      - tests/fixtures/authoring/legacy-div.ssmd
+      - tests/fixtures/authoring/readio-preflight.ssmd.md
+      - tests/test_packaging.py
+      - tests/test_public_api.py
+      - tests/test_readio_smoke.py
+      - tests/test_ssmd_authoring.py
+      - tests/test_ssmd_lint.py
+      - tests/test_standalone_prompts.py
+      - tests/test_store.py
+      - tests/test_templates.py
+      - tests/test_validation.py
+    sources:
+      - git:4a09392c214a5d89e4ef399127c710e22caf7c9c
+    prs: []
+    issues: []
+    contributors:
+      - "@holgern"
+  - kind: internal
+    summary: ""
+    status: draft
+    source_refs:
+      - git:ef872f8eaa3ca47e8340a4177aa2e8ba75d7700e
+    paths:
+      - pyproject.toml
+      - ssmdstudio/cli.py
+      - ssmdstudio/ssmd.py
+    sources:
+      - git:ef872f8eaa3ca47e8340a4177aa2e8ba75d7700e
+    prs: []
+    issues: []
+    contributors:
+      - "@holgern"
