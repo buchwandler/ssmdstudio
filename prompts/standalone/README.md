@@ -57,6 +57,12 @@ The generated file must not contain Markdown fences, surrounding explanation, sh
 
 When file creation is unavailable, return the complete raw SSMD source directly in the response, without Markdown fences or surrounding explanation. Save that response as a `.ssmd.md` file before handing it to a downstream consumer.
 
+## Audio-first quality
+
+Write for the listener, not only the markup: context, actions, references, topic or scene changes, and speaker turns should be understandable when heard. When speaker roles are needed, assign each different person a distinct, stable symbolic role and never reuse a role. Pitch, rate, volume, and other prosody are temporary delivery choices, not speaker identity. Introduce speakers and add attribution or action beats when needed, especially after long dialogue. Preserve source meaning and caveats, and give the requested arc a useful close. Treat guide examples as syntax and quality demonstrations; do not copy their premise, cast or relationships, structure, or distinctive material.
+
+These are content expectations, not structural validation criteria. SSMDStudio lint checks SSMD structure and optional roundtrip, but does not establish Readio renderability, validate downstream planning or voice resolution, or prove audio-dependent judgments. Mark listening claims unverified unless listening actually occurred.
+
 ## Downstream compatibility context
 
 SSMDStudio authors SSMD 0.9 and does not depend on UtterPlan. For downstream Readio use, the current declared compatibility bounds are:

@@ -14,6 +14,8 @@ Do not use another guide as a hidden shared include or treat one model's output 
 
 This is evaluation material, not a CI benchmark. External-model generation, synthesis, listening, and scoring are optional manual activities. Normal CI must not require a model, provider account, audio engine, or rendered audio.
 
+For manual content review, verify that different recurring speakers have unique, stable, non-reused symbolic roles and that pitch, rate, volume, or other effects are never doing identity work. Check scene and topic transitions in spoken context, plus a useful ending. For source-grounded tasks, check source fidelity and caveats. Mark audio-dependent claims unverified unless someone actually heard rendered audio; prompt inputs and SSMD markup alone are not listening evidence.
+
 ## Prompt coverage
 
 Each guide has a plain generative prompt:

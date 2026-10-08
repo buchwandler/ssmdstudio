@@ -165,18 +165,29 @@ def test_all_guides_share_audio_quality_contract_and_audio_drama_has_narrator() 
     required = (
         "listener who cannot see",
         "narrated context",
-        "stable symbolic `voice` role",
-        "pitch, rate, volume, emphasis, pauses, and other prosody change delivery only",
+        "distinct, stable symbolic `voice` role",
+        "never reuse a role for a different speaker",
+        "pitch, rate, volume, emphasis, pauses, and other prosody affect delivery only, never identity",
+        "distinct supported symbolic role",
         "spoken introductions",
+        "brief action beats as needed",
+        "restore context after a long dialogue run",
         "visual-only information",
         "natural, varied speech",
         "requested duration",
         "keep semantics portable",
+        "speaker-role mapping",
+        "relationship dynamics",
+        "distinctive style",
+    )
+    role_prosody_pattern = re.compile(
+        r'(?m)^:::[{].*(?:voice="[^"]+".*(?:pitch|rate|volume)=|(?:pitch|rate|volume)=.*voice="[^"]+")'
     )
     for path, text in _guides():
         contract = _section(text, "Audio quality contract").casefold()
         for phrase in required:
             assert phrase in contract, (path.name, phrase)
+        assert not role_prosody_pattern.search(text), path.name
 
     drama = _section(
         (GUIDE_DIR / "audio-drama.md").read_text(encoding="utf-8"),
@@ -193,8 +204,27 @@ def test_catalog_readme_documents_ssmd_authoring_and_runtime_template_distinctio
     assert "create exactly one utf-8 `.ssmd.md` file" in lowered
     assert "legacy `.ssmd`" in lowered
     assert "starter documents managed by `ssmdstudio template`" in lowered
+    assert "audio-first quality" in lowered
+    assert "never reuse a role" in lowered
+    assert (
+        "pitch, rate, volume, and other prosody are temporary delivery choices, not speaker identity"
+        in lowered
+    )
+    assert "does not establish readio renderability" in lowered
+    assert "mark listening claims unverified" in lowered
     assert not list(PROMPT_ROOT.rglob("*.ssmd"))
     assert not (PROMPT_ROOT / "standalone" / "readio" / "SKILL.md").exists()
+
+
+def test_package_readme_documents_audio_first_and_renderability_boundary() -> None:
+    readme = Path(__file__).parents[1] / "README.md"
+    lowered = readme.read_text(encoding="utf-8").casefold()
+    assert "audio-first" in lowered
+    assert (
+        "never use pitch, rate, volume, or other acoustic qualities as speaker identity" in lowered
+    )
+    assert "a pass does not establish renderability by readio or another consumer" in lowered
+    assert "does not resolve semantic plans, synthesize, listen to, or export audio" in lowered
 
 
 def test_evaluation_corpus_is_complete_and_separate_from_hard_validation() -> None:
@@ -221,6 +251,16 @@ def test_evaluation_corpus_is_complete_and_separate_from_hard_validation() -> No
         in rubric
     )
     assert "mark it **unverified**" in rubric
+    assert "unique, stable, non-reused symbolic roles" in corpus
+    assert "pitch, rate, volume, or other effects are never doing identity work" in corpus
+    assert "spoken context" in corpus
+    assert "useful ending" in corpus
+    assert "source fidelity and caveats" in corpus
+    assert "distinct, stable, non-reused symbolic role" in rubric
+    assert "pitch/rate/volume or other effects define identity" in rubric
+    assert "action beats restore context after long dialogue" in rubric
+    assert "ending quality" in rubric
+    assert "source fidelity" in rubric
 
 
 def test_ssmd_examples_parse_when_runtime_is_available() -> None:

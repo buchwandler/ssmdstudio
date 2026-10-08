@@ -19,7 +19,7 @@ The standalone creative `funny-story.md` and the workflow conversion `ssmd.md` a
 
 ## Standalone SSMD authoring
 
-This file-oriented workflow needs no Studio project, model provider, or audio renderer. Built-in starters are installed in the user template library before use; `reset --all` restores the packaged starter names and overwrites local edits to those names, while custom templates are preserved.
+Standalone authoring is audio-first: each SSMD file should make sense when heard without source layout, markup, or speaker labels. Give different recurring speakers distinct, stable symbolic roles; never use pitch, rate, volume, or other acoustic qualities as speaker identity. Use spoken context and attribution to clarify turns, preserve source meaning, and give the requested arc a useful ending. This file-oriented workflow needs no Studio project, model provider, or audio renderer. Built-in starters are installed in the user template library before use; `reset --all` restores the packaged starter names and overwrites local edits to those names, while custom templates are preserved.
 
 ```bash
 ssmdstudio template reset --all
@@ -38,7 +38,7 @@ ssmdstudio ssmd bind episode.ssmd.md --provider kokoro \
   --output episode.bound.ssmd.md
 ```
 
-Replace the voice placeholders with IDs selected for the named provider; Studio does not discover or verify provider voices. Core project operations do not require the optional `ssmd` runtime. Studio lint checks SSMD structure and optional roundtrip only; it does not resolve render plans, synthesize, or export audio. When a downstream Readio render preflight is wanted, use its no-audio dry run:
+Replace the voice placeholders with IDs selected for the named provider; Studio does not discover or verify provider voices. Core project operations do not require the optional `ssmd` runtime. Studio lint checks SSMD structure and optional roundtrip only; a pass does not establish renderability by Readio or another consumer. It does not resolve semantic plans, synthesize, listen to, or export audio. To check Readio-specific render readiness, separately use its no-audio dry run:
 
 ```bash
 python -m readio render --file episode.bound.ssmd.md --input-format ssmd \

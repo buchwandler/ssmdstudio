@@ -43,14 +43,15 @@ If downloadable file or artifact creation is unavailable:
 Write for a listener who cannot see the source, markup, speaker labels, or page layout.
 
 - Keep enough narrated context for the listener to understand the current section and why the next line follows.
-- Give each recurring speaker one stable symbolic `voice` role throughout the document. `voice` identifies the speaker; pitch, rate, volume, emphasis, pauses, and other prosody change delivery only.
-- Make speaker distinction understandable without relying on particular acoustic qualities: add spoken introductions, attribution, or clear transitions when needed.
+- Give each recurring speaker one distinct, stable symbolic `voice` role throughout the document, and never reuse a role for a different speaker. `voice` identifies the speaker; pitch, rate, volume, emphasis, pauses, and other prosody affect delivery only, never identity.
+- For multi-speaker work, map each speaker to a distinct supported symbolic role before drafting. If the available roles cannot represent the cast, simplify it where appropriate or ask the caller for a binding plan; do not invent role names or use acoustic qualities to distinguish people.
+- Make speaker and topic changes understandable without relying on acoustic qualities: use spoken introductions, attribution, clear transitions, and brief action beats as needed, especially to restore context after a long dialogue run.
 - Narrate visual-only information when it is necessary for understanding; clarify references, names, numbers, time, place, and action in spoken context.
 - Prefer natural, varied speech. Give each spoken paragraph or turn one main job; do not make the whole document uniformly staccato or dense.
 - Use SSMD prosody sparingly and only where it materially improves meaning or timing. Most lines should work without markup.
 - For a requested duration, estimate spoken words and pauses before drafting. Treat this as a planning estimate, never an exact render-duration guarantee.
 - Keep semantics portable: do not rely on provider-specific voice IDs, runtime settings, or nonportable markup unless the caller supplies valid bindings and explicitly requests them.
-- Treat examples as demonstrations, not content templates; do not copy their premise, cast, sequence, or wording unless requested.
+- Treat examples as demonstrations of SSMD syntax and quality, not templates. Do not copy their premise, cast, speaker-role mapping, relationship dynamics, sequence, comedic devices, recurring objects, wording, or distinctive style unless requested.
 
 ## Target runtime
 
@@ -145,7 +146,7 @@ Use explicit, readable prosody. Prefer long attribute names:
 Block-level prosody is valid:
 
 ```ssmd
-:::{voice="narrator" rate="slow" pitch="low"}
+:::{voice="narrator"}
 The room went silent.
 :::
 ```
@@ -333,7 +334,7 @@ Today we will practice one German greeting.
 Listen first, then repeat.
 :::
 
-:::{voice="guest" rate="slow"}
+:::{voice="guest"}
 [Guten Morgen.]{lang="de"}
 :::
 
