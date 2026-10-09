@@ -1,0 +1,73 @@
+schema_version: 1
+object_type: commit_audit_sheet
+versioning:
+  schema_version: 1
+  revision: 3
+release_version: v0.1.1
+git_base_ref: v0.1.0
+git_base_sha: 49f0b79d608f9898e5df43e97bfbf8e066116aeb
+git_head_ref: HEAD
+git_head_sha: 87392da810d30313df0c82e0140f7c0a6d616811
+git_range: 49f0b79d608f9898e5df43e97bfbf8e066116aeb..87392da810d30313df0c82e0140f7c0a6d616811
+commit_count: 1
+rows:
+  - sha: 87392da810d30313df0c82e0140f7c0a6d616811
+    source_ref: git:87392da810d30313df0c82e0140f7c0a6d616811
+    short_sha: 87392da
+    changed_paths:
+      - README.md
+      - prompts/evals/README.md
+      - prompts/evals/rubric.md
+      - prompts/standalone/README.md
+      - prompts/standalone/ssmd/audio-drama.md
+      - prompts/standalone/ssmd/debate-pro-con.md
+      - prompts/standalone/ssmd/document-summary.md
+      - prompts/standalone/ssmd/dramatic-story.md
+      - prompts/standalone/ssmd/educational-explainer.md
+      - prompts/standalone/ssmd/funny-story.md
+      - prompts/standalone/ssmd/general-narration.md
+      - prompts/standalone/ssmd/guided-meditation.md
+      - prompts/standalone/ssmd/kids-story.md
+      - prompts/standalone/ssmd/language-learning.md
+      - prompts/standalone/ssmd/news-briefing.md
+      - prompts/standalone/ssmd/podcast-interview.md
+      - prompts/standalone/ssmd/podcast-roundtable.md
+      - prompts/standalone/ssmd/podcast-solo.md
+      - prompts/standalone/ssmd/quiz-trivia.md
+      - tests/test_standalone_prompts.py
+    stats:
+      files_changed: 20
+      insertions: 150
+      deletions: 87
+    inspected: true
+    inspected_paths:
+      - README.md
+      - prompts/evals/README.md
+      - prompts/evals/rubric.md
+      - prompts/standalone/README.md
+      - prompts/standalone/ssmd/audio-drama.md
+      - prompts/standalone/ssmd/debate-pro-con.md
+      - prompts/standalone/ssmd/document-summary.md
+      - prompts/standalone/ssmd/dramatic-story.md
+      - prompts/standalone/ssmd/educational-explainer.md
+      - prompts/standalone/ssmd/funny-story.md
+      - prompts/standalone/ssmd/general-narration.md
+      - prompts/standalone/ssmd/guided-meditation.md
+      - prompts/standalone/ssmd/kids-story.md
+      - prompts/standalone/ssmd/language-learning.md
+      - prompts/standalone/ssmd/news-briefing.md
+      - prompts/standalone/ssmd/podcast-interview.md
+      - prompts/standalone/ssmd/podcast-roundtable.md
+      - prompts/standalone/ssmd/podcast-solo.md
+      - prompts/standalone/ssmd/quiz-trivia.md
+      - tests/test_standalone_prompts.py
+    observed_behavior:
+      Updated standalone authoring guidance and examples to require
+      distinct, stable speaker roles, clearer spoken context, and portable prosody;
+      expanded tests to enforce these rules and document audio-first renderability limits.
+    public_impact: public
+    decision: accepted
+    stale: false
+    evidence_subject: "feat: updated prompts"
+    target_entry_id: entry-0001
+    notes: ""
