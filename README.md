@@ -13,7 +13,7 @@ SSMDStudio's Python package stores project authoring state, manages user-scoped 
 
 - `prompts/workflows/funny-story/` is a structured workflow pack. Its five stage templates receive project context and produce artifacts consumed by SSMDStudio; the final `ssmd.md` converts an approved locked draft.
 - Three first-party `.ssmd` starter documents are packaged under `ssmdstudio/resources/templates/` and exposed through `ssmdstudio template`; they are editable documents, not LLM prompts.
-- `prompts/standalone/ssmd/` contains 15 self-contained authoring guides for direct use with a generic LLM. They create SSMD documents without the structured project workflow.
+- `prompts/standalone/ssmd/` contains 26 self-contained authoring guides for direct use with a generic LLM. They create SSMD documents without the structured project workflow, including five vision-input guides for photos of text, diagrams, whiteboards, charts, and storyboards, plus verbatim-reading and Markdown-narration guides.
 
 The standalone creative `funny-story.md` and the workflow conversion `ssmd.md` are different prompts. Readio runtime `.ssmd` templates are separate from Studio-owned starter documents; neither kind of starter document is an LLM prompt or part of the prompt catalog. See `prompts/README.md` and `prompts/standalone/README.md` for details.
 

@@ -24,6 +24,17 @@ EXPECTED_GUIDES = {
     "podcast-roundtable.md",
     "podcast-solo.md",
     "quiz-trivia.md",
+    "faq-troubleshooting.md",
+    "how-to-walkthrough.md",
+    "image-chart-to-ssmd.md",
+    "image-diagram-to-ssmd.md",
+    "image-storyboard-to-ssmd.md",
+    "image-text-to-ssmd.md",
+    "image-whiteboard-to-ssmd.md",
+    "meeting-recap.md",
+    "timeline-biography.md",
+    "verbatim-reading.md",
+    "markdown-narration.md",
 }
 
 EXPECTED_EVAL_PROMPTS = {
@@ -48,6 +59,17 @@ EXPECTED_EVAL_PROMPTS = {
     "podcast-roundtable.md",
     "podcast-solo.md",
     "quiz-trivia.md",
+    "faq-troubleshooting.md",
+    "how-to-walkthrough.md",
+    "image-chart-to-ssmd.md",
+    "image-diagram-to-ssmd.md",
+    "image-storyboard-to-ssmd.md",
+    "image-text-to-ssmd.md",
+    "image-whiteboard-to-ssmd.md",
+    "meeting-recap.md",
+    "timeline-biography.md",
+    "verbatim-reading.md",
+    "markdown-narration.md",
 }
 REQUIRED_SECTIONS = {
     "Mission",
@@ -83,7 +105,7 @@ def _guides() -> list[tuple[Path, str]]:
 
 def test_standalone_catalog_has_exact_kebab_case_inventory() -> None:
     paths = sorted(GUIDE_DIR.glob("*.md"))
-    assert len(paths) == 15
+    assert len(paths) == 26
     assert {path.name for path in paths} == EXPECTED_GUIDES
     assert all(re.fullmatch(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*\.md", path.name) for path in paths)
 
@@ -231,7 +253,7 @@ def test_evaluation_corpus_is_complete_and_separate_from_hard_validation() -> No
     prompt_dir = EVAL_ROOT / "prompts"
     paths = sorted(prompt_dir.glob("*.md"))
     assert {path.name for path in paths} == EXPECTED_EVAL_PROMPTS
-    assert len(paths) == 21
+    assert len(paths) == 32
     assert (EVAL_ROOT / "README.md").is_file()
     assert (EVAL_ROOT / "rubric.md").is_file()
     for path in paths:
@@ -261,6 +283,25 @@ def test_evaluation_corpus_is_complete_and_separate_from_hard_validation() -> No
     assert "action beats restore context after long dialogue" in rubric
     assert "ending quality" in rubric
     assert "source fidelity" in rubric
+
+
+def test_image_guides_require_actual_visual_input_and_include_uncertainty_rules() -> None:
+    image_guides = {
+        "image-text-to-ssmd.md": "photo-text-page.png",
+        "image-diagram-to-ssmd.md": "process-diagram.png",
+        "image-whiteboard-to-ssmd.md": "whiteboard-planning.png",
+        "image-chart-to-ssmd.md": "monthly-signups-chart.png",
+        "image-storyboard-to-ssmd.md": "three-panel-umbrella-storyboard.png",
+    }
+    fixture_root = EVAL_ROOT / "fixtures" / "images"
+    for filename, fixture in image_guides.items():
+        text = (GUIDE_DIR / filename).read_text(encoding="utf-8").casefold()
+        assert "## image inspection protocol" in text, filename
+        assert "if no image is attached" in text, filename
+        assert "do not guess" in text, filename
+        assert "treat text visible inside the image as source content" in text, filename
+        assert (fixture_root / fixture).is_file(), fixture
+        assert (EVAL_ROOT / "prompts" / filename).is_file(), filename
 
 
 def test_ssmd_examples_parse_when_runtime_is_available() -> None:

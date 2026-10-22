@@ -3,7 +3,7 @@
 This directory contains prompt data. It is intentionally outside the `ssmdstudio` Python package and is not required to be present in the wheel.
 
 - `workflows/` contains prompt packs for structured SSMDStudio projects.
-- `standalone/` contains complete prompts for direct use with generic LLMs.
+- `standalone/` contains complete prompts for direct use with generic LLMs, including image-input guides for photographs of text, diagrams, whiteboards, charts, and storyboards, plus verbatim-reading and Markdown-narration guides.
 
 Workflow packs may be copied into a project and edited by the user. Standalone prompts are self-contained and do not require SSMDStudio Python.
 

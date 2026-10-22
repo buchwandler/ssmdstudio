@@ -55,4 +55,7 @@ def test_wheel_contains_typing_metadata_but_no_prompt_or_skill_prose(tmp_path: P
     assert not any(name.endswith("resources/templates/README.md") for name in members)
     assert not any(name.endswith("SKILL.md") for name in members)
     assert not any(name.startswith("skill/") for name in members)
+    assert not any(name.startswith("prompts/") for name in members)
+    assert not any("/fixtures/images/" in name for name in members)
+    assert not any(name.endswith(".png") for name in members)
     assert (ROOT / "ssmdstudio" / "resources" / "templates" / "podcast.ssmd").is_file()

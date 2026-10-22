@@ -88,6 +88,8 @@ Portable does not mean guaranteed to render on every model with no later configu
 
 ## Guide catalog
 
+The catalog includes 26 self-contained guides. Image-based guides require the user to attach the actual image; they do not infer unseen content or rely on image filenames.
+
 - [`ssmd/general-narration.md`](ssmd/general-narration.md) — general narration
 - [`ssmd/podcast-solo.md`](ssmd/podcast-solo.md) — one-speaker podcast or commentary
 - [`ssmd/podcast-interview.md`](ssmd/podcast-interview.md) — host and guest interview
@@ -103,8 +105,31 @@ Portable does not mean guaranteed to render on every model with no later configu
 - [`ssmd/language-learning.md`](ssmd/language-learning.md) — listen/repeat or bilingual lesson
 - [`ssmd/debate-pro-con.md`](ssmd/debate-pro-con.md) — balanced debate or tradeoff discussion
 - [`ssmd/quiz-trivia.md`](ssmd/quiz-trivia.md) — quiz or trivia with thinking pauses
+- [`ssmd/how-to-walkthrough.md`](ssmd/how-to-walkthrough.md) — step-by-step how-to walkthrough
+- [`ssmd/meeting-recap.md`](ssmd/meeting-recap.md) — meeting recap and action items
+- [`ssmd/faq-troubleshooting.md`](ssmd/faq-troubleshooting.md) — FAQ and troubleshooting
+- [`ssmd/timeline-biography.md`](ssmd/timeline-biography.md) — timeline or biography
+- [`ssmd/image-text-to-ssmd.md`](ssmd/image-text-to-ssmd.md) — photo of text to spoken SSMD
+- [`ssmd/image-diagram-to-ssmd.md`](ssmd/image-diagram-to-ssmd.md) — diagram to spoken SSMD
+- [`ssmd/image-whiteboard-to-ssmd.md`](ssmd/image-whiteboard-to-ssmd.md) — whiteboard or mind map recap
+- [`ssmd/image-chart-to-ssmd.md`](ssmd/image-chart-to-ssmd.md) — chart or infographic explanation
+- [`ssmd/image-storyboard-to-ssmd.md`](ssmd/image-storyboard-to-ssmd.md) — storyboard or comic panels
+- [`ssmd/verbatim-reading.md`](ssmd/verbatim-reading.md) — exact reading of supplied text
+- [`ssmd/markdown-narration.md`](ssmd/markdown-narration.md) — faithful spoken rendering of Markdown structure
 
 Keep these standalone guides distinct from the five-stage staged workflow pack in `prompts/workflows/funny-story/`. The standalone guide creates an SSMD artifact directly; workflow prompts operate on structured project context and produce artifacts for SSMDStudio's staged authoring workflow.
+
+## Image-based guides
+
+Five guides accept one or more attached images and produce only a complete `.ssmd.md` artifact. Attach the image in the same conversation as the guide. Use a clear, upright, well-lit image; include a closer crop when small text matters. For complex diagrams, include the full diagram and a crop of dense labels if needed. The guides explicitly prohibit guessing unreadable text or ambiguous relationships. They are intended for a vision-capable LLM and do not run OCR or image processing in SSMDStudio itself.
+
+## Additional spoken formats
+
+The catalog also adds practical how-to walkthroughs, meeting recaps, FAQ/troubleshooting, timeline/biography, exact reading, and faithful Markdown narration. These remain separate standalone guides because their preservation and structure requirements differ.
+
+## Readio authoring concepts
+
+The Readio package snapshot has a runtime skill and `.ssmd` starter documents rather than a separate standalone LLM-prompt catalog. The `verbatim-reading` and `markdown-narration` guides capture the relevant authoring intents as provider-neutral SSMD prompts. Readio's `.ssmd` starter files remain runtime templates, not LLM prompts, and are not copied into this catalog.
 
 ## Guide evaluations
 
